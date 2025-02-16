@@ -5,3 +5,5 @@ This is a repository for the project "The file drawer problem in experimental ph
 ## Structure of the repository
 
 - `01_SURVEY` - Inventory used for data collection.
+	- `survey.lss` - LimeSurvey Survey Structure file
+	- `survey.pdf` - printable PDF
