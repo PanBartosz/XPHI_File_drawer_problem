@@ -1,0 +1,1199 @@
+---
+title: 'The file drawer problem in experimental philosophy: what is not published
+  and why?'
+output:
+  html_document: default
+  pdf_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+
+```{r message=FALSE, include=F}
+library(rlang)
+library(tidyverse)
+library(ggpubr)
+library(flextable)
+library(pander)
+library(ggpubr)
+library(stringr)
+set_flextable_defaults(digits = 2)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
+```
+
+```{r message=F, include=F}
+count_table <- function(data, var, dropna = TRUE) {
+  data %>%
+    group_by({{ var }}, .drop = dropna) %>%
+    summarize(n = n()) %>%
+    mutate(`%` = 100 * n / sum(n)) %>%
+    flextable() %>%
+    colformat_double()
+}
+
+desc_table <- function(data, var, ...) {
+  data %>%
+    group_by(...) %>%
+    summarise(
+      n  = sum(!is.na({{ var }})),
+      M  = mean({{ var }}, na.rm = TRUE),
+      SD = sd({{ var }}, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    flextable() %>%
+    colformat_double()
+}
+
+
+count_plot <- function(data,
+                       var,
+                       digits = 1,
+                       fill = "steelblue",
+                       text_size = 5,
+                       dropna=TRUE) {
+  plot_df <- results %>%
+    group_by({{ var }}, .drop = dropna) %>%
+    summarize(n = n(), drop = dropna) %>%
+    mutate(`%` = 100 * n / sum(n)) %>%
+    mutate(label = paste0(round(`%`, digits), "% (", n, ")"))
+  
+  ggplot(plot_df, aes(x = {{ var }}, y = `%`)) +
+    geom_col(fill = fill, width = 0.8) +
+    geom_text(aes(label = label), vjust = -0.4, size  = text_size) +
+    scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
+    labs(
+      x = NULL,
+      y = "%",
+      title = paste("Distribution of", rlang::as_label(enquo(var)))
+    ) +
+    theme_minimal(base_size = 16) +
+    theme(plot.title.position = "plot",
+          axis.text.x = element_text(angle = 45, hjust = 1))
+}
+
+count_plot_hbar <- function(data,
+                            var,
+                            digits = 1, 
+                            fill = "steelblue",
+                            text_size = 5,
+                            label_wrap = 20,
+                            order_desc = TRUE) {
+
+  var_sym <- ensym(var)
+  var_chr <- as_name(var_sym)
+
+  plot_df <- data %>% 
+    count(!!var_sym, name = "n") %>% 
+    mutate(percent = 100 * n / sum(n),
+           label   = paste0(round(percent, digits), "% (", n, ")"),
+           y_lbl   = str_wrap(as.character(!!var_sym), width = label_wrap))
+
+  ## optional ordering by frequency
+  if (order_desc) {
+    plot_df <- plot_df %>% arrange(desc(n))
+  }
+  plot_df <- plot_df %>%  
+    mutate(y_lbl = factor(y_lbl, levels = rev(unique(y_lbl))))
+
+  ggplot(plot_df, aes(x = percent, y = y_lbl)) +
+    geom_col(fill = fill, width = 0.8) +
+    geom_text(aes(label = label),
+              hjust = -0.05, size = text_size) +
+    scale_x_continuous(expand = expansion(mult = c(0, 0.24))) +
+    labs(x = "%", y = NULL,
+         title = paste("Distribution of", var_chr)) +
+    theme_minimal(base_size = 16) +
+    theme(plot.title.position = "plot") +
+    coord_cartesian(clip = "off")
+}
+
+density_plot <- function(data, var) {
+  var_char <- deparse(substitute(var))
+  ggdensity(
+    data = results,
+    x = var_char,
+    add = "mean",
+    rug = T,
+    fill = adjustcolor("steelblue", alpha.f = 0.5)
+  ) +
+    xlab(var_char)
+}
+
+multi_choice_plot <- function(data,
+                              cols,                 
+                              code_to_label,
+                              other_col   = NULL, 
+                              yes_values  = c("Yes", "yes", "1", 1, TRUE),
+                              digits      = 2, 
+                              fill        = "steelblue",
+                              text_size   = 5,
+                              label_wrap  = 30, 
+                              bar_width   = 0.7,
+                              lineheight  = 1.1,
+                              label_pad   = 2) {
+
+  total_n <- nrow(data)
+
+  counts <- data %>% 
+    summarise(across(all_of(cols),
+                     ~ sum(.x %in% yes_values, na.rm = TRUE))) %>% 
+    pivot_longer(everything(),
+                 names_to  = "colname",
+                 values_to = "n") %>% 
+    mutate(code = str_extract(colname, "(?<=\\[).+?(?=\\])"))
+
+  if (!is.null(other_col) && other_col %in% names(data)) {
+    counts <- bind_rows(
+      counts,
+      tibble(
+        colname = other_col,
+        n       = sum(!is.na(data[[other_col]]) & data[[other_col]] != ""),
+        code    = "OTHER"
+      )
+    )
+    code_to_label[["OTHER"]] <- "Other (free text)"
+  }
+
+  plot_df <- counts %>% 
+    rowwise() %>% 
+    mutate(
+      label_text = code_to_label[[code]],
+      percent    = 100 * n / total_n,
+      display    = paste0(round(percent, digits), "% (", n, ")"),
+      y_lbl      = str_wrap(label_text, label_wrap)
+    ) %>% 
+    arrange(desc(percent)) %>% 
+    mutate(y_lbl = factor(y_lbl, levels = rev(unique(y_lbl))))  # biggest on top
+
+  ggplot(plot_df, aes(x = percent, y = y_lbl)) +
+    geom_col(width = bar_width, fill = fill) +
+    geom_text(aes(label = display), hjust = -0.05, size = text_size) +
+    scale_x_continuous(expand = expansion(mult = c(0, 0.12))) +
+    labs(x = "% of respondents", y = NULL,
+         title = "Options selected (multiple choice)") +
+    theme_minimal(base_size = 16) +
+    theme(
+      axis.text.y = element_text(lineheight = lineheight,
+                                 margin = margin(t = label_pad, b = label_pad)),
+      plot.title.position = "plot"
+    ) +
+    coord_cartesian(clip = "off") + 
+    xlim(NA, 1.3*max(plot_df$percent))
+}
+
+
+num_cols_plot <- function(data,
+                          cols,
+                          code_to_label = NULL, 
+                          label_wrap    = 25,   
+                          order_desc    = TRUE, 
+                          fill          = "steelblue",
+                          bar_width     = 0.8,
+                          digits        = 2, 
+                          rotate_labels = TRUE, 
+                          ...) {               
+  
+  long_df <- data %>% 
+    select(all_of(cols)) %>% 
+    pivot_longer(everything(),
+                 names_to  = "variable",
+                 values_to = "value") %>% 
+    mutate(variable = str_extract(variable, "(?<=\\[).+?(?=\\])"))
+  
+  long_df <- long_df %>% 
+    mutate(var_label = if (!is.null(code_to_label)) {
+                         str_wrap(unname(code_to_label[variable]), label_wrap)
+                       } else {
+                         str_wrap(variable, label_wrap)
+                       })
+  
+  means <- long_df %>% 
+           group_by(var_label) %>% 
+           summarise(m = mean(value, na.rm = TRUE), .groups = "drop")
+  
+  order_lvls <- if (order_desc) {
+                  means %>% arrange(desc(m)) %>% pull(var_label)
+                } else {
+                  means %>% arrange(m) %>% pull(var_label)
+                }
+  long_df$var_label <- factor(long_df$var_label, levels = order_lvls)
+  
+  plt <- ggbarplot(
+          long_df,
+          x= "var_label",
+          y = "value",
+          add= "mean_se",          # mean ± SE
+          fill= fill,
+          width = bar_width,
+          ...) +
+         labs(
+           x   = NULL,
+           y   = "Mean ± SE",
+           title = "Average scores with standard error"
+         ) +
+         scale_y_continuous(labels = scales::number_format(accuracy = 10^(-digits))) +
+         theme_minimal(base_size = 16) +
+         theme(
+           plot.title.position = "plot",
+           axis.text.x = element_text(
+                           angle = if (rotate_labels) 45 else 0,
+                           hjust = if (rotate_labels) 1 else 0.5)
+         )
+  
+  plt
+}
+
+steelblue_pal <- function(n, alpha = 1, direction = 1) {
+  if (n < 1) stop("`n` must be a positive integer")
+
+  base   <- grDevices::col2rgb("steelblue")/255      # RGB  value (vector 0–1)
+  lighter <- grDevices::rgb(base[1] + (1 - base[1]) * 0.65,
+                            base[2] + (1 - base[2]) * 0.65,
+                            base[3] + (1 - base[3]) * 0.65)
+  darker  <- grDevices::rgb(base[1] * 0.35,
+                            base[2] * 0.35,
+                            base[3] * 0.35)
+
+  pal <- grDevices::colorRampPalette(c(lighter, "steelblue", darker))(n)
+  if (direction < 0) pal <- rev(pal)
+  grDevices::adjustcolor(pal, alpha.f = alpha)
+}
+
+scale_fill_steelblue <- function(..., alpha = 1, direction = 1) {
+  discrete_scale("fill", "steelblue",
+                 palette  = function(n) steelblue_pal(n, alpha, direction),
+                 ...)
+}
+
+scale_colour_steelblue <- function(..., alpha = 1, direction = 1) {
+  discrete_scale("colour", "steelblue",
+                 palette  = function(n) steelblue_pal(n, alpha, direction),
+                 ...)
+}
+
+
+multi_choice_table <- function(data,
+                               cols,
+                               code_to_label,
+                               other_col = NULL,
+                               yes_values = c("Yes", "yes", "1", 1, TRUE),
+                               digits = 2) {
+  
+  total_n <- nrow(data)
+
+  counts <- data %>% 
+    summarise(across(all_of(cols),
+                     ~ sum(.x %in% yes_values, na.rm = TRUE))) %>% 
+    pivot_longer(everything(),
+                 names_to  = "colname",
+                 values_to = "n") %>% 
+    mutate(code = str_extract(colname, "(?<=\\[).+?(?=\\])"))
+
+  if (!is.null(other_col) && other_col %in% names(data)) {
+    counts <- bind_rows(
+      counts,
+      tibble(
+        colname = other_col,
+        n       = sum(!is.na(data[[other_col]]) & data[[other_col]] != ""),
+        code    = "OTHER"
+      )
+    )
+    code_to_label[["OTHER"]] <- "Other (free text)"
+  }
+
+  tbl <- counts %>% 
+    rowwise %>% 
+    mutate(
+      Option = code_to_label[[code]],
+      `%`        = 100 * n / total_n
+    ) %>% 
+    select(Option, n, `%`) %>% 
+    arrange(desc(`%`))
+
+  flextable(tbl) |>
+    colformat_double(j = c("n", "%"), digits = digits) |>
+    autofit()
+}
+
+num_cols_table <- function(data,
+                           cols,                  # char vector of numeric columns
+                           code_to_label = NULL,  # named vector/list (optional)
+                           digits        = 2,
+                           order_desc    = TRUE) {
+
+  tbl <- data %>% 
+    select(all_of(cols)) %>% 
+    pivot_longer(everything(),
+                 names_to  = "variable",
+                 values_to = "value") %>% 
+    mutate(variable = str_extract(variable, "(?<=\\[).+?(?=\\])")) %>% 
+    group_by(variable) %>% 
+    summarise(
+      n  = sum(!is.na(value)),
+      M  = mean(value, na.rm = TRUE),
+      SD = sd(value,   na.rm = TRUE),
+      SE = SD / sqrt(n),
+      .groups = "drop"
+    )
+
+  tbl <- tbl %>% 
+    rowwise %>%  
+    mutate(Scale = if (!is.null(code_to_label))
+                    code_to_label[[variable]] else variable)
+
+  # order by mean if requested
+  if (order_desc) {
+    tbl <- arrange(tbl, desc(M))
+  }
+
+  tbl <- tbl %>% 
+    select(Scale, n, M, SD, SE)
+
+  flextable(tbl) |>
+    colformat_double(j = c("M", "SD", "SE"), digits = digits) |>
+    autofit()
+}
+
+
+free_text_table <- function(data,
+                            cols,
+                            code_to_label = NULL,
+                            id_col = NULL,
+                            exclude_blank = TRUE,
+                            wrap_width = 80
+                            ) {
+  long_df <- data %>% 
+    select(all_of(cols), {{ id_col }}) %>% 
+    pivot_longer(cols = all_of(cols),
+                 names_to  = "colname",
+                 values_to = "response")
+
+  long_df <- long_df %>% 
+    filter(!is.na(response)) %>% 
+    { if (exclude_blank) filter(., trimws(response) != "") else . }
+
+  long_df <- long_df %>% 
+    rowwise %>% 
+    mutate(
+      Question  = if (!is.null(code_to_label)) code_to_label[[colname]] else colname,
+      response  = str_wrap(response, wrap_width)
+  )
+
+  out <- if (!is.null(id_col)) {
+           long_df %>% select({{ id_col }}, Question, response)
+         } else {
+           long_df %>% select(Question, response)
+         }
+
+  flextable(out) %>% 
+    autofit()
+}
+
+```
+
+```{r message=F}
+results <- read_csv("results-survey187652_24_05_2025_full_answers.csv")
+```
+
+# Prescreening
+
+## [P1] Have you completed a doctoral degree (or equivalent terminal degree, e.g., PhD, EdD, JD, MFA, MBA)?
+
+```{r}
+count_table(results, P1)
+count_plot(results, P1)
+```
+
+## [P2] Are you currently pursuing a PhD in philosophy or a related field (e.g., cognitive science, psychology)?
+
+```{r}
+count_table(results, P2)
+count_plot(results, P2)
+```
+
+## [P3] Do you conduct quantitative experimental or empirical research in experimental philosophy or related to experimental philosophy? (Note: By quantitative research, we mean research with data collection that results in numerical data)
+
+```{r}
+count_table(results, P3)
+count_plot(results, P3)
+```
+
+## [P4] Are you currently affiliated with a university/research institution (e.g., as a student, faculty member, or researcher)?
+
+```{r}
+count_table(results, P4)
+count_plot(results, P4)
+```
+
+# Demography
+
+## [D1] In which year did you complete your first doctoral (or equivalent terminal) degree (e.g., PhD, EdD, JD, MFA, MBA)?
+
+```{r}
+desc_table(results, D1)
+density_plot(results, D1)
+```
+
+## [D2] In which year did you begin your first doctoral (or equivalent terminal) degree program?
+
+```{r}
+desc_table(results, D2)
+density_plot(results, D2)
+```
+
+## [D3] How many years have you been actively conducting research in experimental philosophy?
+
+```{r}
+desc_table(results, D3)
+density_plot(results, D3)
+```
+
+## [D4] In which country did you complete your doctoral (or equivalent terminal) degree?
+
+```{r, fig.height=10}
+count_table(results, D4)
+count_plot_hbar(results, D4)
+```
+
+## [D5] During your undergraduate or graduate studies (e.g., MA, PhD), how many courses or training sessions did you complete that focused primarily on quantitative research methods and/or statistics?
+
+```{r}
+desc_table(results, D5)
+density_plot(results, D5)
+```
+
+## [D6] In which country is your current university/institution located?
+
+```{r, fig.height=10}
+count_table(results, D6)
+count_plot_hbar(results, D6)
+```
+
+## [D7] What is your current professional title or role?
+
+```{r}
+count_table(results, D7 )
+count_plot_hbar(results, D7)
+```
+
+## [D8] Which of the following disciplines most closely aligns with your primary research area in experimental philosophy?
+
+```{r fig.width=12, fig.height=10}
+disciplines <- list(
+  "SQ001" = "philosophy of action",
+  "SQ002" = "ethics",
+  "SQ003" = "epistemology",
+  "SQ004" = "philosophy of language",
+  "SQ005" = "philosophy of mind",
+  "SQ006" = "metaphysics",
+  "SQ007" = "foundations of experimental philosophy",
+  "SQ008" = "logic and argumentation theory",
+  "SQ009" = "aesthetics and philosophy of art",
+  "SQ010" = "philosophy of law",
+  "SQ011" = "philosophy of religion"
+)
+
+cols_D8 <- paste0("D8[", names(disciplines), "]")
+
+multi_choice_table(results,
+                  cols = cols_D8,
+                  code_to_label = disciplines,
+                  other_col = "D8[other]",
+                  )
+
+multi_choice_plot(results,
+                  cols = cols_D8,
+                  code_to_label = disciplines,
+                  other_col = "D8[other]",
+                  label_wrap = 25)
+
+free_text_table(results, "D8[other]", list("D8[other]" = "Other"))
+```
+
+## For the following questions, consider your publication activity over the past 5 years and provide an average estimate. Note: If you began your doctoral (or equivalent terminal) degree fewer than 5 years ago, base your responses only on the period since you started that degree.
+
+## [D9] On average, how many experimental philosophy projects (e.g., research articles, book chapters) do you publish per year? Please consider both theoretical and empirical research, including single- and co-authored projects.
+
+```{r}
+desc_table(results, D9)
+density_plot(results, D9)
+```
+
+## [D10] How many of your experimental philosophy projects published per year appear in peer-reviewed journals?
+
+```{r}
+desc_table(results, D10)
+density_plot(results, D10)
+```
+
+## [D11] How many of your experimental philosophy projects published each year include quantitative data analysis?
+
+```{r}
+desc_table(results, D11)
+density_plot(results, D11)
+```
+
+## [D12] If you have any additional comments or wish to clarify any responses, please enter them below.
+
+
+# Prevalence
+
+## [R1] In the past 5 years, how many of the research projects involving quantitative data analysis you have been involved in (including your students’ work) has stopped or terminated at each of the following stages?
+
+```{r}
+stages <- list(
+  "SQ001" = "Data analysis",
+  "SQ002" = "Formal Presentation (e.g., unpublished report, thesis)",
+  "SQ003" = "Professional Presentation (e.g., conference presentation, talk)",
+  "SQ004" = "Submitted Manuscript (Editor’s Rejection Reasons)",
+  "SQ005" = "Reviewed Manuscript (Reviewer’s Rejection Reasons)",
+  "SQ006" = "Published paper"
+)
+
+cols_R1 <- paste0("R1[", names(stages), "]")
+
+num_cols_table(results,
+              cols = cols_R1,
+              code_to_label = stages
+              )
+
+num_cols_plot(results,
+              cols = cols_R1,
+              code_to_label = stages
+              )
+```
+
+
+## [R2] In case of research projects that have stopped or terminated at the stage of **data analysis**, what were the reasons for termination?
+
+```{r}
+reasons <- list(
+  "SQ001" = "Loss of interest or lack of resources",
+  "SQ002" = "Additional studies needed (follow-ups, replications, etc.)",
+  "SQ003" = "Conceptual, methodological, or statistical concerns",
+  "SQ004" = "Unimportant or unanticipated results",
+  "SQ005" = "Null results (non-significant findings)"
+)
+
+cols_R2 <- paste0("R2[", names(reasons), "]")
+
+multi_choice_table(results,
+                  cols = cols_R2,
+                  code_to_label = reasons,
+                  )
+
+multi_choice_plot(results,
+                  cols = cols_R2,
+                  code_to_label = reasons,
+                  label_wrap= 25)
+```
+
+## [R3] In case of research projects that have stopped or terminated at the stage of **formal presentation**, what were the reasons for termination?
+
+```{r}
+reasons <- list(
+  "SQ001" = "Loss of interest or lack of resources",
+  "SQ002" = "Additional studies needed (follow-ups, replications, etc.)",
+  "SQ003" = "Conceptual, methodological, or statistical concerns",
+  "SQ004" = "Unimportant or unanticipated results",
+  "SQ005" = "Null results (non-significant findings)"
+)
+
+cols_R3 <- paste0("R3[", names(reasons), "]")
+
+multi_choice_table(results,
+                  cols = cols_R3,
+                  code_to_label = reasons,
+                  )
+
+multi_choice_plot(results,
+                  cols = cols_R3,
+                  code_to_label = reasons,
+                  label_wrap = 25)
+```
+
+## [R4] In case of research projects that have stopped or terminated at the stage of **professional presentation**, what were the reasons for termination?
+
+```{r}
+reasons <- list(
+  "SQ001" = "Loss of interest or lack of resources",
+  "SQ002" = "Additional studies needed (follow-ups, replications, etc.)",
+  "SQ003" = "Conceptual, methodological, or statistical concerns",
+  "SQ004" = "Unimportant or unanticipated results",
+  "SQ005" = "Null results (non-significant findings)"
+)
+
+cols_R4 <- paste0("R4[", names(reasons), "]")
+
+multi_choice_table(results,
+                  cols = cols_R4,
+                  code_to_label = reasons,
+                  )
+
+multi_choice_plot(results,
+                  cols = cols_R4,
+                  code_to_label = reasons,
+                  label_wrap = 25)
+```
+
+
+## [R5] In case of research projects that have stopped or terminated at the stage of **submitted manuscript**, what were the reasons for termination?
+
+```{r}
+reasons <- list(
+  "SQ001" = "Not aligned with the journal’s scope or profile",
+  "SQ002" = "Results considered unimportant by the editor",
+  "SQ003" = "Manuscript quality concerns (e.g., poor writing, excessive length)",
+  "SQ004" = "Null results (non-significant findings)"
+)
+
+cols_R5 <- paste0("R5[", names(reasons), "]")
+
+multi_choice_table(results,
+                  cols = cols_R5,
+                  code_to_label = reasons,
+                  )
+
+multi_choice_plot(results,
+                  cols = cols_R5,
+                  code_to_label = reasons,
+                  label_wrap = 25)
+```
+
+## [R6] In case of research projects that have stopped or terminated at the stage of **reviewed manuscript**, what were the reasons for termination?
+
+```{r}
+reasons <- list(
+  "SQ001" = "Conceptual, methodological, or statistical concerns",
+  "SQ002" = "Results considered unimportant by reviewers",
+  "SQ003" = "Manuscript quality concerns (e.g., poor writing, excessive length)",
+  "SQ004" = "Null results (non-significant findings)"
+)
+
+cols_R6 <- paste0("R6[", names(reasons), "]")
+
+multi_choice_table(results,
+                  cols = cols_R6,
+                  code_to_label = reasons,
+                  )
+
+multi_choice_plot(results,
+                  cols = cols_R6,
+                  code_to_label = reasons,
+                  label_wrap= 25)
+```
+
+
+# Awareness/implications
+
+## [I1] Before participating in this study, were you aware of the issue of many scientific results remaining unpublished for reasons not related to their scientific quality (sometimes referred to as the “file drawer problem” or “publication bias”)?
+
+```{r}
+count_table(results, I1)
+count_plot(results, I1)
+```
+
+## [I2] How familiar are you with this issue?
+
+```{r}
+results$I2 <- factor(results$I2,
+       levels = c("1 - Not at all familiar",
+                  "2",
+                  "3",
+                  "4",
+                  "5 - Very familiar"))
+count_table(results, I2, dropna = FALSE)
+count_plot(results, I2, dropna = FALSE)
+```
+
+## [I3] In your opinion, does the “file drawer problem” apply to experimental philosophy research?
+
+```{r}
+results$I3 <- factor(results$I3,
+       levels = c("1 - Definitely not",
+                  "2",
+                  "3",
+                  "4",
+                  "5 - Definitely yes"))
+count_table(results, I3, dropna = FALSE)
+count_plot(results, I3, dropna = FALSE)
+```
+
+## [I4] Please indicate your familiarity with the following possible consequences of the file drawer problem, as well as how severe you believe each consequence is for the quality of research in experimental philosophy.
+
+```{r fig.width=10}
+consequences <- list(
+  "SQ001" = "Biased understanding of research results (e.g. overestimation of effect sizes, overestimation of how common certain phenomena are).",
+  "SQ002" = "Difficulty in evaluating the replicability of research findings.",
+  "SQ003" = "Bias toward novelty over replication.",
+  "SQ004" = "Lack of negative result replications.",
+  "SQ005" = "Wasted research efforts due to redundant studies.",
+  "SQ006" = "Reduced study quality due to pressure for significance.",
+  "SQ007" = "Career setbacks for early-career researchers or other underprivileged groups."
+)
+
+questions <- list("1" = "Familiarity", "2" = "Consequences")
+
+long_df <- pivot_longer(results, cols = matches("I4\\[SQ...\\]\\[\\d\\]"),
+             values_to = "value",
+             names_to = "variable")
+
+long_df <- long_df %>% 
+  mutate(ccode = str_sub(variable, 4L, 8L), qcode = str_sub(variable, 11L, 11L)) %>% 
+  rowwise %>% 
+  mutate(Consequence = consequences[[ccode]], Question = questions[[qcode]]) %>% 
+  mutate(label = str_wrap(Consequence, 25))
+
+
+means <- long_df %>% 
+          group_by(Consequence, Question) %>% 
+          summarise(m = mean(value, na.rm = TRUE), .groups = "drop")
+
+p <- ggbarplot(
+          long_df,
+          x= "label",
+          y = "value",
+          add= "mean_se",          # mean ± SE
+          fill= "Question",
+          width = 0.7,
+          position = position_dodge(0.9),
+          ylim = c(1, 5),
+          ) +
+         labs(
+           x   = NULL,
+           y   = "Mean ± SE",
+           title = "Average scores with standard error"
+         ) +
+         scale_y_continuous(labels = scales::number_format(accuracy = 10^(-2))) +
+        scale_fill_steelblue() +
+         theme_minimal(base_size = 12) +
+         theme(
+           plot.title.position = "plot",
+           axis.text.x = element_text(
+                           angle = 45,
+                           hjust = 1)
+         )
+
+ggpar(p, legend = "bottom")
+```
+
+## [I5] Below is a list of research practices that are sometimes considered problematic in scientific research, including the file drawer problem. Please rate how acceptable you believe these practices are within the community of experimental philosophers.
+
+```{r, fig.width=13, fig.height=10}
+qrps = list(
+  "SQ001" = "Selecting variables out of convenience and/or familiarity when more theoretically grounded variables are available",
+  "SQ002" = "Fishing for results by collecting information on unnecessary variables",
+  "SQ003" = "Not being transparent with regard to the reporting on what steps were taken for data cleaning (e.g., removing cases/items without a stated criterion or justification for doing so)",
+  "SQ004" = "Removing whole items/cases knowingly / purposefully to obtain favorable results",
+  "SQ005" = "Employing selective reporting of results/instruments",
+  "SQ006" = "Cherry-picking data to analyze",
+  "SQ007" = "Not attempting to publish results in a timely manner"
+)
+recode_acceptability <- function(x){
+  recode(x,
+                `Completely acceptable` = 1,
+                `Mostly acceptable` = 2,
+                `Neither acceptable nor unacceptable` = 3,
+                `Mostly unacceptable` = 4,
+                `Completely unacceptable` = 5,
+                `Prefer not to answer` = -1)
+}
+
+cols_I5 <- paste0("I5[", names(qrps), "]")
+results <- results %>% 
+  mutate(across(cols_I5, recode_acceptability))  %>% 
+  mutate(across(cols_I5, ~na_if(., -1)))
+
+num_cols_table(results,
+              cols = cols_I5,
+              code_to_label = qrps,
+              )
+
+num_cols_plot(results,
+              cols = cols_I5,
+              code_to_label = qrps,
+              label_wrap = 35 
+              )
+```
+
+
+# Solutions
+
+## [S1] Do your research sponsors (e.g., your institution, ethics review committee, or funding agency) require you to do any of the following?
+
+```{r}
+requirements <- list(
+  "SQ001" = "Develop a data management plan before starting the research.",
+  "SQ002" = "Make research data publicly available.",
+  "SQ003" = "Publish in open access journals.",
+  "SQ004" = "Upload preprints or articles to a public repository.",
+  "SQ005" = "None of the above."
+)
+
+cols_S1 <- paste0("S1[", names(requirements), "]")
+
+multi_choice_table(results,
+                  cols          = cols_S1,
+                  code_to_label = requirements,
+                  )
+
+multi_choice_plot(results,
+                  cols          = cols_S1,
+                  code_to_label = requirements,
+                  label_wrap    = 25)
+
+```
+
+## [S2] Does your current organization or institution provide any of the following resources or support?
+
+```{r fig.height=9}
+resources <- list(
+  "SQ001" = "An institutional repository for scientific publications.",
+  "SQ002" = "A research data repository.",
+  "SQ003" = "Funding for publishing in open access journals.",
+  "SQ004" = "Assistance in disseminating research results or preprints.",
+  "SQ005" = "Citable digital object identifiers (DOIs) for datasets or research reports.",
+  "SQ006" = "None of the above."
+)
+
+cols_S2 <- paste0("S2[", names(resources), "]")
+
+multi_choice_table(results,
+                  cols          = cols_S2,
+                  code_to_label = resources,
+                  )
+
+multi_choice_plot(results,
+                  cols          = cols_S2,
+                  code_to_label = resources,
+                  label_wrap    = 25)
+```
+
+
+## [S3] Are you familiar with any repositories, sites, or tools suitable for experimental philosophy, such as the following?
+
+```{r}
+tools <- list(
+  "SQ001" = "Online databases of null results.",
+  "SQ002" = "Online databases of replication studies.",
+  "SQ003" = "Data journals.",
+  "SQ004" = "Preprint publication platforms.",
+  "SQ005" = "Journals that publish null results.",
+  "SQ006" = "None of the above."
+)
+
+tools_specify <- list(
+  "S3[SQ001comment]" = "Online databases of null results.",
+  "S3[SQ002comment]" = "Online databases of replication studies.",
+  "S3[SQ003comment]" = "Data journals.",
+  "S3[SQ004comment]" = "Preprint publication platforms.",
+  "S3[SQ005comment]" = "Journals that publish null results.",
+  "S3[SQ006comment]" = "None of the above."
+)
+
+
+cols_S3 <- paste0("S3[", names(resources), "]")
+
+multi_choice_table(results,
+                  cols          = cols_S3,
+                  code_to_label = tools,
+                  )
+
+multi_choice_plot(results,
+                  cols          = cols_S3,
+                  code_to_label = tools,
+                  label_wrap    = 25)
+
+free_text_table(results, names(tools_specify), tools_specify)
+```
+
+## [S4] Please indicate whether you are currently engaging in or planning to engage in the following activities:
+
+```{r fig.width=10, fig.height=12}
+activities <- list(
+  "SQ001" = "Publish a preprint",
+  "SQ002" = "Publish in an open access journal",
+  "SQ003" = "Deposit an author’s accepted manuscript of a non-open access journal article in a repository to make it openly available",
+  "SQ004" = "Cite a dataset",
+  "SQ005" = "Cite code or software used for data analysis or visualization",
+  "SQ006" = "Publish a data paper or publish a dataset independently from a journal article or scholarly work",
+  "SQ007" = "Make data available, but only to researchers with appropriate credentials (e.g. via a data access committee)",
+  "SQ008" = "Share or publish other research materials (e.g. stimuli, questionnaires) independently from a journal article or scholarly work",
+  "SQ009" = "Share or publish a study protocol, workflow, or method independently from a journal article or scholarly work",
+  "SQ010" = "Pre-register a study",
+  "SQ011" = "Submitting a registered report",
+  "SQ012" = "Take advantage of a data curation or research data management service offered by a publisher or other third party",
+  "SQ013" = "Publish a direct replication of a previously published study (possibly as part of another study)",
+  "SQ015" = "Publish my results in a form of micropublication (research note or a very short publication designed for unpublished observations, neutral or null results) " # not a mistake, 14 is skipped in the survey...
+)
+
+questions <- list("1" = "Present", "2" = "Future")
+
+long_df <- pivot_longer(results, cols = matches("S4\\[SQ...\\]\\[\\d\\]"),
+             values_to = "value",
+             names_to = "variable")
+
+long_df <- long_df %>% 
+  mutate(acode = str_sub(variable, 4L, 8L), qcode = str_sub(variable, 11L, 11L)) %>% 
+  rowwise %>% 
+  mutate(Activity = activities[[acode]], Question = questions[[qcode]]) %>% 
+  mutate(label = str_wrap(Activity, 25))
+
+plot_df <- long_df %>% 
+          group_by(Activity, Question, value) %>% 
+          summarise(n = n()) %>% 
+          mutate(`%` = 100 * n / sum(n)) %>% 
+          mutate(label = str_wrap(Activity, 35),
+                 display = paste0(round(`%`, 2), "% (", n, ")"),
+                 ) 
+
+ggplot(plot_df, aes(x = `%`, y = label, fill = value)) +
+    geom_col(width = 0.8, position = position_dodge(0.9)) +
+    geom_text(aes(label = display),
+              hjust = -0.05, size = 3, position = position_dodge(0.9)) +
+    scale_x_continuous(expand = expansion(mult = c(0, 0.24))) +
+    labs(x = "%", y = NULL,
+         title = paste("Distribution of S4")) +
+    theme_minimal(base_size = 13) +
+    theme(plot.title.position = "plot") +
+    coord_cartesian(clip = "off") + 
+    scale_fill_steelblue() +
+    facet_grid(. ~ Question)
+```
+
+# [S5] Below is a list of potential reasons why researchers might not publish their data, code, or research reports. Please rate how much each reason applies to you or your research.
+
+```{r fig.width=13, fig.height=11}
+reasons = list(
+  "SQ001" = "Concerns about intellectual property or ownership issues.",
+  "SQ002" = "Fear of misuse or misrepresentation of the data/code.",
+  "SQ003" = "Desire to maintain a competitive advantage (e.g., worry that others might use the data to produce competing publications before the original authors can).",
+  "SQ004" = "Lack of direct benefits, rewards, or incentives for the time and effort required to prepare data, code, or reports.",
+  "SQ005" = "Technical challenges (e.g., issues with compatibility, version control, or documentation of code or data).",
+  "SQ006" = "Journal policies that do not require sharing supplementary materials.",
+  "SQ007" = "Fear of criticism or the possibility of exposing errors.",
+  "SQ008" = "Pressure to publish in high-impact journals, leaving little time to ensure reproducibility or share materials.",
+  "SQ009" = "Restrictions imposed by funding agencies, commercial partners, or collaborative agreements.",
+  "SQ010" = "Lack of training or skills (e.g., no expertise in formatting or preparing data/code/reports).",
+  "SQ011" = "Extra effort that feels overwhelming amidst other responsibilities."
+)
+recode_reasons <- function(x){
+  recode(x,
+                `Not a reason at all` = 1,
+                `Slightly a reason` = 2,
+                `Moderately a reason` = 3,
+                `Strongly a reason` = 4,
+                `Extremely a reason` = 5)
+}
+
+cols_S5 <- paste0("S5[", names(reasons), "]")
+results <- results %>% 
+  mutate(across(cols_S5, recode_reasons))
+
+num_cols_table(results,
+              cols = cols_S5,
+              code_to_label = reasons,
+              )
+
+num_cols_plot(results,
+              cols = cols_S5,
+              code_to_label = reasons,
+              label_wrap = 35 
+              )
+
+free_text_table(results, "S5part2other", list("S5part2other" = "Other"))
+```
+
+## [S6] Evaluate how the following incentives would motivate you to engage in open and transparent research practices, such as sharing data, code, or other research materials, publishing preprints, depositing manuscripts or datasets in open access repositories, citing data or software, pre-registering studies, and submitting registered reports.
+
+
+```{r fig.width=10, fig.height=10}
+incentives = list(
+  "SQ001" = "Including these practices in researcher evaluations or project assessments.",
+  "SQ002" = "Additional funding specifically designated to support these practices.",
+  "SQ003" = "Availability of experimental philosophy-specific databases or repositories for data, materials, and code.",
+  "SQ004" = "Assignment of a permanent DOI for datasets, pre-registrations, reports, preprints, or any additional materials.",
+  "SQ005" = "Standardized templates or guidelines for pre-registration, open reporting, dataset preparation, and other transparent research activities in experimental philosophy."
+)
+recode_incentives <- function(x){
+  recode(x,
+                `1- Not motivating` = 1,
+                `2` = 2,
+                `3` = 3,
+                `4` = 4,
+                `5 - Highly motivating` = 5)
+}
+
+cols_S6 <- paste0("S6[", names(incentives), "]")
+results <- results %>% 
+  mutate(across(cols_S6, recode_incentives))
+
+num_cols_table(results,
+              cols = cols_S6,
+              code_to_label = incentives,
+              )
+
+num_cols_plot(results,
+              cols = cols_S6,
+              code_to_label = incentives,
+              label_wrap = 35 
+              )
+```
+
+
+# Reports/micropublication
+
+## [M1] Do you publish micropublications, eg., research notes or reports of unpublished studies, negative results, or failed replications?
+
+```{r}
+results$M1 <- factor(results$M1,
+                     levels = c("Always",
+                                "Often",
+                                "Sometimes",
+                                "Rarely",
+                                "Never"))
+count_table(results, M1, dropna = F)
+count_plot(results, M1, dropna = F)
+```
+
+## [M2] Where do you publish micropublications?
+
+```{r}
+micro <- list(
+  "SQ001" = "ResearchGate",
+  "SQ002" = "Open Science Framework (PsyArχiv)",
+  "SQ003" = "Github",
+  "SQ004" = "Personal website / blog"
+)
+
+cols_M2 <- paste0("M2[", names(micro), "]")
+
+multi_choice_table(results,
+                  cols = cols_M2,
+                  code_to_label = micro,
+                  other_col = "M2[Other]")
+
+multi_choice_plot(results,
+                  cols = cols_M2,
+                  code_to_label = micro,
+                  label_wrap = 25,
+                  other_col = "M2[Other]")
+
+#free_text_table(results, "M2[other]", list("M2[other]" = "Other"))
+```
+
+# Data sharing/publishing
+
+## [H1] Have you ever archived, deposited, or published a dataset to make it available to others?
+
+```{r fig.height=9, fig.width=9}
+archives <- list(
+  "SQ001" = "Yes, I have published my data as part of a journal article (e.g. sharing a full dataset as part of the supplementary materials).",
+  "SQ002" = "Yes, I have deposited my data in a government or funder sponsored repository (e.g. NIMH Data Archive).",
+  "SQ003" = "Yes, I have shared my data using the Open Science Framework (OSF).",
+  "SQ004" = "Yes, I have deposited my data into a general purpose repository besides the OSF (e.g figshare, Zenodo).",
+  "SQ005" = "Yes, I have deposited my data in a discipline-specific repository.",
+  "SQ006" = "Yes, I have deposited my data in my institutional repository.",
+  "SQ007" = "No."
+)
+
+cols_H1 <- paste0("H1[", names(archives), "]")
+
+multi_choice_table(results,
+                  cols = cols_H1,
+                  code_to_label = archives,
+                  other_col = "H1[Other]")
+
+multi_choice_plot(results,
+                  cols = cols_H1,
+                  code_to_label = archives,
+                  label_wrap = 30,
+                  other_col = "H1[Other]")
+
+#free_text_table(results, "H1[other]", list("H1[other]" = "Other"))
+```
+
+
+## [H2] What is your motivation for sharing your data (for example, by uploading some or all of it to a general or discipline-specific repository)?
+
+```{r fig.height=9, fig.width=9}
+motivations <- list(
+  "SQ001" = "To communicate my results and/or add to the scholarly literature.",
+  "SQ002" = "To allow other researchers to assess the validity of my conclusions.",
+  "SQ003" = "Professional incentives (e.g. authorship or citations).",
+  "SQ004" = "To establish intellectual property or patent claims.",
+  "SQ005" = "It is mandated by a funder, publisher, or my institution.",
+  "SQ006" = "To foster transparency and reproducibility.",
+  "SQ007" = "To foster re-use (e.g. facilitate meta-analyses)."
+)
+
+cols_H2 <- paste0("H2[", names(motivations), "]")
+
+multi_choice_table(results,
+                  cols = cols_H2,
+                  code_to_label = motivations,
+                  other_col = "H2[Other]")
+
+multi_choice_plot(results,
+                  cols = cols_H2,
+                  code_to_label = motivations,
+                  label_wrap = 25,
+                  other_col = "H2[Other]")
+
+#free_text_table(results, "H2[other]", list("H2[other]" = "Other"))
+```
+
+## [H4] Please indicate your level of need for training or education for each of the following data-sharing practices:
+
+```{r fig.height=9, fig.width=9}
+needs = list(
+  "SQ001" = "Sharing data in a form that ensures it will be useful to others (e.g. in open file formats, with proper documentation, etc).",
+  "SQ002" = "Use of different platforms, repositories, or tools for sharing data (e.g. Open Science Framework, figshare, institutional repository options).",
+  "SQ003" = "Protecting participant confidentiality in shared data.",
+  "SQ004" = "Understanding reuse rights related to data (e.g. copyright, licensing, citations).",
+  "SQ005" = "Best practices for preserving or archiving data over the long term."
+)
+recode_needs <- function(x){
+  recode(x,
+                `1 - No need` = 1,
+                `2` = 2,
+                `3` = 3,
+                `4` = 4,
+                `5 - High level of need` = 5)
+}
+
+cols_H4 <- paste0("H4[", names(needs), "]")
+results <- results %>% 
+  mutate(across(cols_H4, recode_needs))
+
+num_cols_table(results,
+              cols = cols_H4,
+              code_to_label = needs,
+              )
+
+num_cols_plot(results,
+              cols = cols_H4,
+              code_to_label = needs,
+              label_wrap = 35 
+              )
+```
+
+## [H3] How would you rate your willingness to change your data management practices during the data collection phase in response to new technologies, opportunities, or requirements?
+
+```{r}
+results$H3 <- factor(results$H3, 
+                     levels = c("1 - Unwilling",
+                                "2",
+                                "3",
+                                "4",
+                                "5 - Willing"))
+count_table(results, H3, dropna = F)
+count_plot(results, H3, dropna = F)
+```
+
+# Final Comments and Additional Information
+
+```{r}
+free_text_table(results, "H5", list("H5" = "Comments"))
+```
+
