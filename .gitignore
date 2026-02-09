@@ -23,6 +23,9 @@ cache/
 # Local scratch
 nohup.out
 
+# Image viewer artifacts
+figures/feh_*
+
 # Working documents (keep local, do not publish)
 02_RESULTS/CORRECTIONS*.md
 02_RESULTS/EXPLORATORY_ANALYSES.md
