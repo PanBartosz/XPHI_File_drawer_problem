@@ -25,20 +25,27 @@ fig_dir <- file.path("..", "figures")
 dir.create(fig_dir, recursive = TRUE, showWarnings = FALSE)
 
 save_figure_tiff <- function(plot, filename, width, height, dpi = 300) {
-  if (!requireNamespace("ragg", quietly = TRUE)) {
-    stop("Package 'ragg' is required to save TIFF figures.")
-  }
-
   out_path <- file.path(fig_dir, filename)
-  ragg::agg_tiff(
-    filename = out_path,
-    width = width,
-    height = height,
-    units = "in",
-    res = dpi,
-    compression = "lzw",
-    background = "white"
-  )
+  if (requireNamespace("ragg", quietly = TRUE)) {
+    ragg::agg_tiff(
+      filename = out_path,
+      width = width,
+      height = height,
+      units = "in",
+      res = dpi,
+      compression = "lzw",
+      background = "white"
+    )
+  } else {
+    grDevices::tiff(
+      filename = out_path,
+      width = width,
+      height = height,
+      units = "in",
+      res = dpi,
+      compression = "lzw"
+    )
+  }
   on.exit(grDevices::dev.off(), add = TRUE)
   print(plot)
   invisible(out_path)
