@@ -2,8 +2,8 @@
 title: 'The file drawer problem in experimental philosophy: what is not published
   and why?'
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 editor_options:
   chunk_output_type: console
 ---
@@ -17,6 +17,7 @@ library(flextable)
 library(pander)
 library(ggpubr)
 library(stringr)
+library(broom)
 set_flextable_defaults(digits = 2)
 knitr::opts_chunk$set(echo = FALSE, warning = FALSE)
 ```
@@ -50,25 +51,33 @@ count_plot <- function(data,
                        digits = 1,
                        fill = "steelblue",
                        text_size = 5,
-                       dropna=TRUE) {
+                       dropna=TRUE,
+                       show_title = TRUE,
+                       custom_title = NA) {
   plot_df <- results %>%
     group_by({{ var }}, .drop = dropna) %>%
     summarize(n = n(), drop = dropna) %>%
     mutate(`%` = 100 * n / sum(n)) %>%
     mutate(label = paste0(round(`%`, digits), "% (", n, ")"))
   
-  ggplot(plot_df, aes(x = {{ var }}, y = `%`)) +
+  p <- ggplot(plot_df, aes(x = {{ var }}, y = `%`)) +
     geom_col(fill = fill, width = 0.8) +
     geom_text(aes(label = label), vjust = -0.4, size  = text_size) +
     scale_y_continuous(expand = expansion(mult = c(0, 0.12))) +
     labs(
       x = NULL,
-      y = "%",
-      title = paste("Distribution of", rlang::as_label(enquo(var)))
-    ) +
+      y = "%") +
     theme_minimal(base_size = 16) +
     theme(plot.title.position = "plot",
           axis.text.x = element_text(angle = 45, hjust = 1))
+  if (show_title){
+    if (is.character(custom_title)){
+      p <- p + labs(title = custom_title)
+    } else {
+      p <- p + labs(title = paste("Distribution of", rlang::as_label(enquo(var))))
+    }
+  }
+  p
 }
 
 count_plot_hbar <- function(data,
@@ -77,7 +86,9 @@ count_plot_hbar <- function(data,
                             fill = "steelblue",
                             text_size = 5,
                             label_wrap = 20,
-                            order_desc = TRUE) {
+                            order_desc = TRUE,
+                            show_title = TRUE, 
+                            custom_title = NA) {
 
   var_sym <- ensym(var)
   var_chr <- as_name(var_sym)
@@ -95,28 +106,45 @@ count_plot_hbar <- function(data,
   plot_df <- plot_df %>%  
     mutate(y_lbl = factor(y_lbl, levels = rev(unique(y_lbl))))
 
-  ggplot(plot_df, aes(x = percent, y = y_lbl)) +
+  p <- ggplot(plot_df, aes(x = percent, y = y_lbl)) +
     geom_col(fill = fill, width = 0.8) +
     geom_text(aes(label = label),
               hjust = -0.05, size = text_size) +
     scale_x_continuous(expand = expansion(mult = c(0, 0.24))) +
-    labs(x = "%", y = NULL,
-         title = paste("Distribution of", var_chr)) +
+    labs(x = "%", y = NULL) +
     theme_minimal(base_size = 16) +
     theme(plot.title.position = "plot") +
     coord_cartesian(clip = "off")
+  if (show_title) {
+    if (is.character(custom_title)){
+      p <- p + labs(title = custom_title)
+    } else {
+      p <- p + labs(title = paste("Distribution of", var_chr))
+    }
+  }
+  p
 }
 
-density_plot <- function(data, var) {
+density_plot <- function(data, var, custom_xlab = NA) {
   var_char <- deparse(substitute(var))
-  ggdensity(
-    data = results,
+  p <- ggdensity(
+    data = data,
     x = var_char,
-    add = "mean",
+    add = c("median"),
     rug = T,
     fill = adjustcolor("steelblue", alpha.f = 0.5)
-  ) +
-    xlab(var_char)
+  ) + xlab(ifelse(is.character(custom_xlab), custom_xlab, var_char))
+  
+  med_val  <- median(data[[var_char]], na.rm = TRUE)
+  plot_data <- ggplot_build(p)$data[[1]]
+  y_pos <- max(plot_data$density) * 0.6
+
+  p + geom_text(
+    aes(x = med_val, y = y_pos),
+    label = paste("Mdn =", sprintf("%.2f", med_val)),
+    hjust = -0.1,
+    size = 5
+  )
 }
 
 multi_choice_plot <- function(data,
@@ -130,7 +158,10 @@ multi_choice_plot <- function(data,
                               label_wrap  = 30, 
                               bar_width   = 0.7,
                               lineheight  = 1.1,
-                              label_pad   = 2) {
+                              label_pad   = 2,
+                              ylabsize    = 12,
+                              show_title  = TRUE,
+                              order       = NA) {
 
   total_n <- nrow(data)
 
@@ -163,22 +194,32 @@ multi_choice_plot <- function(data,
       y_lbl      = str_wrap(label_text, label_wrap)
     ) %>% 
     arrange(desc(percent)) %>% 
-    mutate(y_lbl = factor(y_lbl, levels = rev(unique(y_lbl))))  # biggest on top
+    mutate(y_lbl = factor(y_lbl,
+                          levels = if (!any(is.na(order))){
+                            str_wrap(order, label_wrap) } else {
+                              rev(unique(y_lbl))}
+                          )
+           )
 
-  ggplot(plot_df, aes(x = percent, y = y_lbl)) +
+  p <- ggplot(plot_df, aes(x = percent, y = y_lbl)) +
     geom_col(width = bar_width, fill = fill) +
     geom_text(aes(label = display), hjust = -0.05, size = text_size) +
     scale_x_continuous(expand = expansion(mult = c(0, 0.12))) +
-    labs(x = "% of respondents", y = NULL,
-         title = "Options selected (multiple choice)") +
     theme_minimal(base_size = 16) +
     theme(
       axis.text.y = element_text(lineheight = lineheight,
-                                 margin = margin(t = label_pad, b = label_pad)),
+                                 margin = margin(t = label_pad, b = label_pad),
+                                 size = ylabsize),
       plot.title.position = "plot"
     ) +
+    labs(x = "% of respondents", y = NULL) +
     coord_cartesian(clip = "off") + 
     xlim(NA, 1.3*max(plot_df$percent))
+  
+  if (show_title){
+    p <- p + labs(title = "Options selected (multiple choice)")
+  }
+  p
 }
 
 
@@ -190,7 +231,9 @@ num_cols_plot <- function(data,
                           fill          = "steelblue",
                           bar_width     = 0.8,
                           digits        = 2, 
-                          rotate_labels = TRUE, 
+                          rotate_labels = TRUE,
+                          show_title    = TRUE,
+                          order = NA,
                           ...) {               
   
   long_df <- data %>% 
@@ -211,11 +254,16 @@ num_cols_plot <- function(data,
            group_by(var_label) %>% 
            summarise(m = mean(value, na.rm = TRUE), .groups = "drop")
   
-  order_lvls <- if (order_desc) {
+  if (!any(is.na(order))){
+    order_lvls <- str_wrap(order, label_wrap)
+  } else {
+    order_lvls <- if (order_desc) {
                   means %>% arrange(desc(m)) %>% pull(var_label)
                 } else {
                   means %>% arrange(m) %>% pull(var_label)
                 }
+  }
+  
   long_df$var_label <- factor(long_df$var_label, levels = order_lvls)
   
   plt <- ggbarplot(
@@ -228,8 +276,7 @@ num_cols_plot <- function(data,
           ...) +
          labs(
            x   = NULL,
-           y   = "Mean ± SE",
-           title = "Average scores with standard error"
+           y   = "Mean ± SE"
          ) +
          scale_y_continuous(labels = scales::number_format(accuracy = 10^(-digits))) +
          theme_minimal(base_size = 16) +
@@ -240,6 +287,9 @@ num_cols_plot <- function(data,
                            hjust = if (rotate_labels) 1 else 0.5)
          )
   
+  if (show_title){
+    plt <- plt + labs(title = "Average scores with standard error")
+  }
   plt
 }
 
@@ -392,7 +442,9 @@ free_text_table <- function(data,
 ```
 
 ```{r message=F}
-results <- read_csv("results-survey187652_24_05_2025_full_answers.csv")
+results <- read_csv("data_public/public_main.csv")
+results_geo_spec <- read_csv("data_public/public_geo_spec.csv")
+results_text <- read_csv("data_public/public_text.csv")
 ```
 
 # Prescreening
@@ -451,8 +503,8 @@ density_plot(results, D3)
 ## [D4] In which country did you complete your doctoral (or equivalent terminal) degree?
 
 ```{r, fig.height=10}
-count_table(results, D4)
-count_plot_hbar(results, D4)
+count_table(results_geo_spec, D4)
+count_plot_hbar(results_geo_spec, D4)
 ```
 
 ## [D5] During your undergraduate or graduate studies (e.g., MA, PhD), how many courses or training sessions did you complete that focused primarily on quantitative research methods and/or statistics?
@@ -465,8 +517,8 @@ density_plot(results, D5)
 ## [D6] In which country is your current university/institution located?
 
 ```{r, fig.height=10}
-count_table(results, D6)
-count_plot_hbar(results, D6)
+count_table(results_geo_spec, D6)
+count_plot_hbar(results_geo_spec, D6)
 ```
 
 ## [D7] What is your current professional title or role?
@@ -474,6 +526,11 @@ count_plot_hbar(results, D6)
 ```{r}
 count_table(results, D7 )
 count_plot_hbar(results, D7)
+```
+
+```{r}
+# For presentation
+count_plot_hbar(results, D7, show_title = FALSE)
 ```
 
 ## [D8] Which of the following disciplines most closely aligns with your primary research area in experimental philosophy?
@@ -495,19 +552,33 @@ disciplines <- list(
 
 cols_D8 <- paste0("D8[", names(disciplines), "]")
 
-multi_choice_table(results,
+multi_choice_table(results_geo_spec,
                   cols = cols_D8,
                   code_to_label = disciplines,
                   other_col = "D8[other]",
                   )
 
-multi_choice_plot(results,
+multi_choice_plot(results_geo_spec,
                   cols = cols_D8,
                   code_to_label = disciplines,
                   other_col = "D8[other]",
-                  label_wrap = 25)
+                  label_wrap = 25,
+                  text_size = 6,
+                  ylabsize = 12)
 
-free_text_table(results, "D8[other]", list("D8[other]" = "Other"))
+free_text_table(results_geo_spec, "D8[other]", list("D8[other]" = "Other"))
+```
+
+```{r}
+# For presentation
+multi_choice_plot(results_geo_spec,
+                  cols = cols_D8,
+                  code_to_label = disciplines,
+                  other_col = "D8[other]",
+                  label_wrap = 25,
+                  text_size = 5,
+                  ylabsize = 11,
+                  show_title = FALSE)
 ```
 
 ## For the following questions, consider your publication activity over the past 5 years and provide an average estimate. Note: If you began your doctoral (or equivalent terminal) degree fewer than 5 years ago, base your responses only on the period since you started that degree.
@@ -519,11 +590,21 @@ desc_table(results, D9)
 density_plot(results, D9)
 ```
 
+```{r}
+# For presentation
+density_plot(results, D9, custom_xlab = "Projects per year")
+```
+
 ## [D10] How many of your experimental philosophy projects published per year appear in peer-reviewed journals?
 
 ```{r}
 desc_table(results, D10)
 density_plot(results, D10)
+```
+
+```{r}
+# For presentation
+density_plot(results, D10, custom_xlab = "Publications per year")
 ```
 
 ## [D11] How many of your experimental philosophy projects published each year include quantitative data analysis?
@@ -533,8 +614,14 @@ desc_table(results, D11)
 density_plot(results, D11)
 ```
 
+```{r}
+# For presentation
+density_plot(results, D11, custom_xlab = "Projects per year")
+```
+
 ## [D12] If you have any additional comments or wish to clarify any responses, please enter them below.
 
+This open-ended free-text item (`D12`) is **not included in the public dataset** to reduce re-identification risk.
 
 # Prevalence
 
@@ -559,7 +646,17 @@ num_cols_table(results,
 
 num_cols_plot(results,
               cols = cols_R1,
-              code_to_label = stages
+              code_to_label = stages,
+              )
+```
+
+```{r}
+# For presentation
+num_cols_plot(results,
+              cols = cols_R1,
+              code_to_label = stages,
+              show_title = FALSE,
+              order = unlist(stages)
               )
 ```
 
@@ -585,7 +682,17 @@ multi_choice_table(results,
 multi_choice_plot(results,
                   cols = cols_R2,
                   code_to_label = reasons,
-                  label_wrap= 25)
+                  label_wrap = 25)
+```
+
+```{r}
+# For presentation
+multi_choice_plot(results,
+                  cols = cols_R2,
+                  code_to_label = reasons,
+                  label_wrap = 25,
+                  show_title = FALSE,
+                  order = unlist(reasons))
 ```
 
 ## [R3] In case of research projects that have stopped or terminated at the stage of **formal presentation**, what were the reasons for termination?
@@ -612,6 +719,16 @@ multi_choice_plot(results,
                   label_wrap = 25)
 ```
 
+```{r}
+# For presentation
+multi_choice_plot(results,
+                  cols = cols_R3,
+                  code_to_label = reasons,
+                  label_wrap = 25,
+                  show_title = FALSE,
+                  order = unlist(reasons))
+```
+
 ## [R4] In case of research projects that have stopped or terminated at the stage of **professional presentation**, what were the reasons for termination?
 
 ```{r}
@@ -634,6 +751,16 @@ multi_choice_plot(results,
                   cols = cols_R4,
                   code_to_label = reasons,
                   label_wrap = 25)
+```
+
+```{r}
+# For presentation
+multi_choice_plot(results,
+                  cols = cols_R4,
+                  code_to_label = reasons,
+                  label_wrap = 25,
+                  show_title = FALSE,
+                  order = unlist(reasons))
 ```
 
 
@@ -660,6 +787,16 @@ multi_choice_plot(results,
                   label_wrap = 25)
 ```
 
+```{r}
+# For presentation
+multi_choice_plot(results,
+                  cols = cols_R5,
+                  code_to_label = reasons,
+                  label_wrap = 25,
+                  show_title = FALSE,
+                  order = unlist(reasons))
+```
+
 ## [R6] In case of research projects that have stopped or terminated at the stage of **reviewed manuscript**, what were the reasons for termination?
 
 ```{r}
@@ -683,6 +820,15 @@ multi_choice_plot(results,
                   label_wrap= 25)
 ```
 
+```{r}
+# For presentation
+multi_choice_plot(results,
+                  cols = cols_R6,
+                  code_to_label = reasons,
+                  label_wrap = 25,
+                  show_title = FALSE,
+                  order = unlist(reasons))
+```
 
 # Awareness/implications
 
@@ -706,6 +852,11 @@ count_table(results, I2, dropna = FALSE)
 count_plot(results, I2, dropna = FALSE)
 ```
 
+```{r}
+# For presentation
+count_plot(results, I2, dropna = FALSE, show_title = F)
+```
+
 ## [I3] In your opinion, does the “file drawer problem” apply to experimental philosophy research?
 
 ```{r}
@@ -717,6 +868,11 @@ results$I3 <- factor(results$I3,
                   "5 - Definitely yes"))
 count_table(results, I3, dropna = FALSE)
 count_plot(results, I3, dropna = FALSE)
+```
+
+```{r}
+# For presentation
+count_plot(results, I3, dropna = FALSE, show_title = F)
 ```
 
 ## [I4] Please indicate your familiarity with the following possible consequences of the file drawer problem, as well as how severe you believe each consequence is for the quality of research in experimental philosophy.
@@ -732,7 +888,7 @@ consequences <- list(
   "SQ007" = "Career setbacks for early-career researchers or other underprivileged groups."
 )
 
-questions <- list("1" = "Familiarity", "2" = "Consequences")
+questions <- list("1" = "Familiarity", "2" = "Severity")
 
 long_df <- pivot_longer(results, cols = matches("I4\\[SQ...\\]\\[\\d\\]"),
              values_to = "value",
@@ -748,6 +904,7 @@ long_df <- long_df %>%
 means <- long_df %>% 
           group_by(Consequence, Question) %>% 
           summarise(m = mean(value, na.rm = TRUE), .groups = "drop")
+means$Question <- factor(means$Question, levels = c("Familiarity", "Severity"))
 
 p <- ggbarplot(
           long_df,
@@ -761,8 +918,8 @@ p <- ggbarplot(
           ) +
          labs(
            x   = NULL,
-           y   = "Mean ± SE",
-           title = "Average scores with standard error"
+           y   = "Mean ± SE"
+           #,title = "Average scores with standard error"
          ) +
          scale_y_continuous(labels = scales::number_format(accuracy = 10^(-2))) +
         scale_fill_steelblue() +
@@ -775,6 +932,28 @@ p <- ggbarplot(
          )
 
 ggpar(p, legend = "bottom")
+```
+
+```{r}
+i4_table <- long_df %>%
+  mutate(
+    Consequence = factor(Consequence, levels = unlist(consequences)),
+    Question    = factor(Question, levels = c("Familiarity", "Severity"))
+  ) %>%
+  group_by(Consequence, Question) %>%
+  summarise(
+    n  = sum(!is.na(value)),
+    M  = if (n > 0) mean(value, na.rm = TRUE) else NA_real_,
+    SD = if (n > 1) sd(value, na.rm = TRUE)   else NA_real_,
+    SE = if (n > 1) SD / sqrt(n)              else NA_real_,
+    .groups = "drop"
+  ) %>%
+  arrange(Consequence, Question) %>%
+  mutate(Consequence = str_wrap(as.character(Consequence), 60))
+
+flextable(i4_table) |>
+  colformat_double(j = c("M", "SD", "SE"), digits = 2) |>
+  autofit()
 ```
 
 ## [I5] Below is a list of research practices that are sometimes considered problematic in scientific research, including the file drawer problem. Please rate how acceptable you believe these practices are within the community of experimental philosophers.
@@ -844,6 +1023,17 @@ multi_choice_plot(results,
 
 ```
 
+```{r}
+# For presentation
+multi_choice_plot(results,
+                  cols          = cols_S1,
+                  code_to_label = requirements,
+                  label_wrap    = 25,
+                  show_title = F,
+                  order = rev(unlist(requirements)))
+```
+
+
 ## [S2] Does your current organization or institution provide any of the following resources or support?
 
 ```{r fig.height=9}
@@ -866,9 +1056,24 @@ multi_choice_table(results,
 multi_choice_plot(results,
                   cols          = cols_S2,
                   code_to_label = resources,
-                  label_wrap    = 25)
+                  label_wrap    = 30,
+                  ylabsize = 12
+                  )
 ```
 
+```{r}
+# For presentation
+order <- c("")
+
+multi_choice_plot(results,
+                  cols          = cols_S2,
+                  code_to_label = resources,
+                  label_wrap    = 30,
+                  ylabsize = 13,
+                  show_title = F,
+                  order = rev(unlist(resources))
+                  )
+```
 
 ## [S3] Are you familiar with any repositories, sites, or tools suitable for experimental philosophy, such as the following?
 
@@ -904,7 +1109,15 @@ multi_choice_plot(results,
                   code_to_label = tools,
                   label_wrap    = 25)
 
-free_text_table(results, names(tools_specify), tools_specify)
+free_text_table(results_text, names(tools_specify), tools_specify)
+```
+
+```{r}
+multi_choice_plot(results,
+                  cols          = cols_S3,
+                  code_to_label = tools,
+                  label_wrap    = 25,
+                  show_title = F)
 ```
 
 ## [S4] Please indicate whether you are currently engaging in or planning to engage in the following activities:
@@ -961,9 +1174,103 @@ ggplot(plot_df, aes(x = `%`, y = label, fill = value)) +
     facet_grid(. ~ Question)
 ```
 
+
+```{r fig.width=8, fig.height=8}
+# For presentation
+activities <- list(
+  "SQ001" = "Publish a preprint",
+  "SQ002" = "Publish in an open access journal",
+  "SQ003" = "Deposit an author’s accepted manuscript of a non-open access journal article in a repository to make it openly available",
+  "SQ004" = "Cite a dataset",
+  "SQ005" = "Cite code or software used for data analysis or visualization",
+  "SQ006" = "Publish a data paper or publish a dataset independently from a journal article or scholarly work",
+  "SQ007" = "Make data available, but only to researchers with appropriate credentials (e.g. via a data access committee)"
+)
+
+questions <- list("1" = "Present", "2" = "Future")
+
+long_df <- pivot_longer(results, cols = matches("S4\\[SQ...\\]\\[\\d\\]"),
+             values_to = "value",
+             names_to = "variable")
+
+long_df <- long_df %>% 
+  mutate(acode = str_sub(variable, 4L, 8L), qcode = str_sub(variable, 11L, 11L)) %>% 
+  filter(acode %in% names(activities)) %>% 
+  rowwise %>% 
+  mutate(Activity = activities[[acode]], Question = questions[[qcode]]) %>% 
+  mutate(label = str_wrap(Activity, 25))
+
+plot_df <- long_df %>% 
+          group_by(Activity, Question, value) %>% 
+          summarise(n = n()) %>% 
+          mutate(`%` = 100 * n / sum(n)) %>% 
+          mutate(label = str_wrap(Activity, 35),
+                 display = paste0(round(`%`, 2), "% (", n, ")"),
+                 ) 
+
+ggplot(plot_df, aes(x = `%`, y = label, fill = value)) +
+    geom_col(width = 0.8, position = position_dodge(0.9)) +
+    geom_text(aes(label = display),
+              hjust = -0.05, size = 3, position = position_dodge(0.9)) +
+    scale_x_continuous(expand = expansion(mult = c(0, 0.24))) +
+    labs(x = "%", y = NULL,
+         title = paste("Distribution of S4")) +
+    theme_minimal(base_size = 13) +
+    theme(plot.title.position = "plot") +
+    coord_cartesian(clip = "off") + 
+    scale_fill_steelblue() +
+    facet_grid(. ~ Question)
+```
+
+```{r fig.width=9, fig.height=9}
+# For presentation
+activities <- list(
+  "SQ008" = "Share or publish other research materials (e.g. stimuli, questionnaires) independently from a journal article or scholarly work",
+  "SQ009" = "Share or publish a study protocol, workflow, or method independently from a journal article or scholarly work",
+  "SQ010" = "Pre-register a study",
+  "SQ011" = "Submitting a registered report",
+  "SQ012" = "Take advantage of a data curation or research data management service offered by a publisher or other third party",
+  "SQ013" = "Publish a direct replication of a previously published study (possibly as part of another study)",
+  "SQ015" = "Publish my results in a form of micropublication (research note or a very short publication designed for unpublished observations, neutral or null results) " # not a mistake, 14 is skipped in the survey...
+)
+questions <- list("1" = "Present", "2" = "Future")
+
+long_df <- pivot_longer(results, cols = matches("S4\\[SQ...\\]\\[\\d\\]"),
+             values_to = "value",
+             names_to = "variable")
+
+long_df <- long_df %>% 
+  mutate(acode = str_sub(variable, 4L, 8L), qcode = str_sub(variable, 11L, 11L)) %>% 
+  filter(acode %in% names(activities)) %>% 
+  rowwise %>% 
+  mutate(Activity = activities[[acode]], Question = questions[[qcode]]) %>% 
+  mutate(label = str_wrap(Activity, 25))
+
+plot_df <- long_df %>% 
+          group_by(Activity, Question, value) %>% 
+          summarise(n = n()) %>% 
+          mutate(`%` = 100 * n / sum(n)) %>% 
+          mutate(label = str_wrap(Activity, 35),
+                 display = paste0(round(`%`, 2), "% (", n, ")"),
+                 ) 
+
+ggplot(plot_df, aes(x = `%`, y = label, fill = value)) +
+    geom_col(width = 0.8, position = position_dodge(0.9)) +
+    geom_text(aes(label = display),
+              hjust = -0.05, size = 3, position = position_dodge(0.9)) +
+    scale_x_continuous(expand = expansion(mult = c(0, 0.24))) +
+    labs(x = "%", y = NULL,
+         title = paste("Distribution of S4")) +
+    theme_minimal(base_size = 13) +
+    theme(plot.title.position = "plot") +
+    coord_cartesian(clip = "off") + 
+    scale_fill_steelblue() +
+    facet_grid(. ~ Question)
+```
+
 # [S5] Below is a list of potential reasons why researchers might not publish their data, code, or research reports. Please rate how much each reason applies to you or your research.
 
-```{r fig.width=13, fig.height=11}
+```{r fig.width=14, fig.height=10}
 reasons = list(
   "SQ001" = "Concerns about intellectual property or ownership issues.",
   "SQ002" = "Fear of misuse or misrepresentation of the data/code.",
@@ -1001,7 +1308,17 @@ num_cols_plot(results,
               label_wrap = 35 
               )
 
-free_text_table(results, "S5part2other", list("S5part2other" = "Other"))
+free_text_table(results_text, "S5part2other", list("S5part2other" = "Other"))
+```
+
+```{r fig.width=18, fig.height=9}
+# For presentation
+num_cols_plot(results,
+              cols = cols_S5,
+              code_to_label = reasons,
+              label_wrap = 35,
+              show_title = F
+              )
 ```
 
 ## [S6] Evaluate how the following incentives would motivate you to engage in open and transparent research practices, such as sharing data, code, or other research materials, publishing preprints, depositing manuscripts or datasets in open access repositories, citing data or software, pre-registering studies, and submitting registered reports.
@@ -1040,6 +1357,17 @@ num_cols_plot(results,
               )
 ```
 
+```{r fig.width=12, fig.height=6}
+# For presentation
+
+num_cols_plot(results,
+              cols = cols_S6,
+              code_to_label = incentives,
+              label_wrap = 35,
+              show_title = F
+              )
+```
+
 
 # Reports/micropublication
 
@@ -1061,7 +1389,7 @@ count_plot(results, M1, dropna = F)
 ```{r}
 micro <- list(
   "SQ001" = "ResearchGate",
-  "SQ002" = "Open Science Framework (PsyArχiv)",
+  "SQ002" = "Open Science Framework (PsyArxiv)",
   "SQ003" = "Github",
   "SQ004" = "Personal website / blog"
 )
@@ -1194,6 +1522,473 @@ count_plot(results, H3, dropna = F)
 # Final Comments and Additional Information
 
 ```{r}
-free_text_table(results, "H5", list("H5" = "Comments"))
+free_text_table(results_text, "H5", list("H5" = "Comments"))
 ```
 
+# X-Phi vs The World
+
+```{r include=F, message=F}
+borghi_vangulick2020 <- read_csv("borghi_vangulick_2020/Borghi_VanGulick_PsychRDM_Data.csv")
+borghi_vangulick2018 <- read_csv("borghi_vangulick_2018/Borghi_VanGulick_2018_data.csv")
+```
+
+## Borghi & VanGulick 2020: `collect_change`,"Response to ""On a scale of 1-5, how would you rate your willingness to change your data management practices during the data collection phase of a project in response to new technologies, opportunities, or requirements?"""
+
+
+```{r}
+results <- results %>% mutate(H3_numeric = recode(H3, `1 - Unwilling` = 1,
+                                `2` = 2,
+                                `3` = 3,
+                                `4` = 4,
+                                `5 - Willing` = 5))
+
+t.test(results$H3_numeric, borghi_vangulick2020$collect_change) %>% pander()
+```
+
+## Borghi & VanGulick 2020: `share_education`,
+
+- `share_education_useful`,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Sharing data in a form that ensures it will be useful to others""."
+
+```{r}
+t.test(borghi_vangulick2020$share_education_useful, results$`H4[SQ001]`) %>% pander()
+```
+
+- `share_education_platforms`,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Use of different platforms, repositories, or tools for sharing data""."
+
+```{r}
+t.test(borghi_vangulick2020$share_education_platforms, results$`H4[SQ002]`) %>% pander()
+```
+
+- `share_education_confidentiality`,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Protecting participant confidentiality in shared data""."
+
+```{r}
+t.test(borghi_vangulick2020$share_education_platforms, results$`H4[SQ003]`) %>% pander()
+```
+
+- `share_education_reuse`,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Understanding reuse rights related to data""."
+
+```{r}
+t.test(borghi_vangulick2020$share_education_platforms, results$`H4[SQ004]`) %>% pander()
+```
+
+- `share_education_archiving`,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Best practices for preserving or archiving data over the long term""."
+
+```{r}
+t.test(borghi_vangulick2020$share_education_platforms, results$`H4[SQ005]`) %>% pander()
+```
+
+
+## Borghi & VanGulick 2020: `share_motivation`,
+
+```{r}
+compare_share_motivation <- function(b_and_vg_column, column, b_and_vg_data, results){
+  prop.table(table(ifelse(!is.na(b_and_vg_data[[b_and_vg_column]][b_and_vg_data$share_motivation == 1]), 1, 0)))
+
+  tab <- rbind(table(ifelse(!is.na(b_and_vg_data[[b_and_vg_column]][b_and_vg_data$share_motivation == 1]), 1, 0)),
+      table(ifelse(results[[column]][results[[column]] != "N/A"] == "Yes", 1, 0))
+      )
+  tab <- tab[,c(2,1)]
+  pander(prop.test(tab))
+}
+```
+
+- `share_motivation`,"If the participant answered the question ""If applicable, what is your motivation for sharing your data (such as through uploading some or all of it to a general or discipline-specific repository)?"". [1=Yes]"
+
+- `share_motivation_results`,If the participant indicated that they are motivated to share data in order to communicate their results. [1=Yes]
+
+```{r}
+compare_share_motivation("share_motivation_results", "H2[SQ001]", borghi_vangulick2020, results)
+```
+
+- `share_motivation_validity`,If the participant indicated that they are motivated to share data to allow other researchers to verify their claims. [1=Yes]
+
+```{r}
+compare_share_motivation("share_motivation_validity", "H2[SQ002]", borghi_vangulick2020, results)
+```
+
+- `share_motivation_incentives`,If the participant indicated that they are motivated to share data by professional incentives. [1=Yes]
+
+```{r}
+compare_share_motivation("share_motivation_incentives", "H2[SQ003]", borghi_vangulick2020, results)
+```
+
+- `share_motivation_ip`,If the participant indicated that they are motivated to share data to establish IP claims. [1=Yes]
+share_motivation_mandate,"If the participant indicated that they are motivated to share data because it is mandated by a funder, publisher, or their institution. [1=Yes]"
+
+```{r}
+compare_share_motivation("share_motivation_ip", "H2[SQ004]", borghi_vangulick2020, results)
+```
+
+
+- `share_motivation_mandate`,"If the participant indicated that they are motivated to share data because it is mandated by a funder, publisher, or their institution. [1=Yes]"
+
+```{r}
+compare_share_motivation("share_motivation_mandate", "H2[SQ005]", borghi_vangulick2020, results)
+```
+
+- `share_motivation_transparency`,If the participant indicated that they are motivated to share data to foster transparency and reproducibility. [1=Yes]
+
+```{r}
+compare_share_motivation("share_motivation_transparency", "H2[SQ006]", borghi_vangulick2020, results)
+```
+
+- `share_motivation_reuse`,If the participant indicated that they are motivated to share data to foster reuse. [1=Yes]
+
+```{r}
+compare_share_motivation("share_motivation_reuse", "H2[SQ007]", borghi_vangulick2020, results)
+```
+
+## Borghi & VanGulick 2020: `share_archive`,
+
+- `share_archive`,"If the participant answered the question ""Have you ever archived, deposited, or published a dataset in order to make it available to others?"". [1=Yes]"
+
+```{r}
+compare_share_archive <- function(b_and_vg_column, column, b_and_vg_data, results){
+  prop.table(table(ifelse(!is.na(b_and_vg_data[[b_and_vg_column]][b_and_vg_data$share_archive == 1]), 1, 0)))
+
+  tab <- rbind(table(ifelse(!is.na(b_and_vg_data[[b_and_vg_column]][b_and_vg_data$share_archive == 1]), 1, 0)),
+      table(ifelse(results[[column]][results[[column]] != "N/A"] == "Yes", 1, 0))
+      )
+  tab <- tab[,c(2,1)]
+  pander(prop.test(tab))
+}
+```
+
+- `share_archive_article`,If the participant indicated that they have shared data as part of a journal article. [1=Yes]
+
+```{r}
+compare_share_archive("share_archive_article", "H1[SQ001]", borghi_vangulick2020, results)
+```
+
+- `share_archive_repo_government`,If the participant indicated that they have shared data through a government or funder sponsored repository. [1=Yes]
+
+```{r}
+compare_share_archive("share_archive_repo_government", "H1[SQ002]", borghi_vangulick2020, results)
+```
+
+- `share_archive_OSF`,If the participant indicated that they have shared data through the OSF. [1=Yes]
+
+```{r}
+compare_share_archive("share_archive_OSF", "H1[SQ003]", borghi_vangulick2020, results)
+```
+
+- `share_archive_repo_other`If the participant indicated that they have shared data through a general purpose repository other than the OSF. [1=Yes]
+
+```{r}
+compare_share_archive("share_archive_repo_other", "H1[SQ004]", borghi_vangulick2020, results)
+```
+
+- `share_archive_repo_disclipline`,If the participant indicated that they have shared data through a discipline specific repository. [1=Yes]
+
+```{r}
+#compare_share_archive("share_archive_repo_discipline", "H1[SQ005]", borghi_vangulick2020, results)
+# ONLY "NO"
+```
+
+- `share_archive_repo_ir`,If the participant indicated that they have shared data through an institutional repository. [1=Yes]
+
+```{r}
+compare_share_archive("share_archive_repo_ir", "H1[SQ006]", borghi_vangulick2020, results)
+```
+
+## Borghi & VanGulick 2020: `sc_activities`,
+
+```{r}
+compare_sc_activities <- function(b_and_vg_column_current, b_and_vg_column_future,
+                                  column_current, column_future,
+                                  b_and_vg_data, results){
+  levels_order <- c("Yes", "No", "I don't know")
+
+  b_and_vg_data[[b_and_vg_column_current]] = factor(b_and_vg_data[[b_and_vg_column_current]],
+                                                    levels = levels_order)
+  b_and_vg_data[[b_and_vg_column_future]] = factor(b_and_vg_data[[b_and_vg_column_future]],
+                                                    levels = levels_order)
+  
+  results[[column_current]] = factor(results[[column_current]], levels = levels_order)
+  results[[column_future]] = factor(results[[column_future]], levels = levels_order)
+  
+  
+  current_prop <- rbind(prop.table(table(b_and_vg_data[[b_and_vg_column_current]])),
+        prop.table(table(results[[column_current]]))
+        )
+  
+  future_prop <- rbind(prop.table(table(b_and_vg_data[[b_and_vg_column_future]])),
+        prop.table(table(results[[column_future]]))
+        )
+  
+  current_tab <- cbind(
+    B_and_VG = table(b_and_vg_data[[b_and_vg_column_current]]),
+    Results = table(results[[column_current]])
+  )
+  
+  future_tab <- cbind(
+    B_and_VG = table(b_and_vg_data[[b_and_vg_column_future]]),
+    Results = table(results[[column_future]])
+  )
+  
+  run_chisq <- function(tab) {
+    tab <- as.matrix(tab)
+    tab <- tab[rowSums(tab) > 0, colSums(tab) > 0, drop = FALSE]
+    if (nrow(tab) < 2 || ncol(tab) < 2) {
+      return(list(statistic = NA_real_, parameter = NA_integer_, p.value = NA_real_))
+    }
+    suppressWarnings(chisq.test(tab))
+  }
+  
+  current_test <- run_chisq(current_tab)
+  future_test  <- run_chisq(future_tab)
+  
+  summary_df <- data.frame(
+    Timepoint = rep(c("Current", "Future"), each = 3),
+    Response = rep(levels_order, 2),
+    B_and_VG_N = c(current_tab[, "B_and_VG"], future_tab[, "B_and_VG"]),
+    B_and_VG_Pct = sprintf("%.1f%%", c(prop.table(current_tab[, "B_and_VG"]) * 100, prop.table(future_tab[, "B_and_VG"]) * 100)),
+    Results_N = c(current_tab[, "Results"], future_tab[, "Results"]),
+    Results_Pct = sprintf("%.1f%%", c(prop.table(current_tab[, "Results"]) * 100, prop.table(future_tab[, "Results"]) * 100))
+  )
+  
+  tests_df <- data.frame(
+    Timepoint = c("Current", "Future"),
+    Chi_Squared = c(current_test$statistic, future_test$statistic),
+    df = c(current_test$parameter, future_test$parameter),
+    p_value = c(current_test$p.value, future_test$p.value)
+  )
+  
+  pander(summary_df, 
+         caption = "Comparison of Responses: Current and Future", 
+         style = 'rmarkdown', 
+         split.table = Inf)
+         
+  pander(tests_df, 
+         caption = "Chi-Squared Test Results", 
+         style = 'rmarkdown')
+}
+```
+
+- `sc_activities_current_preprint`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing preprints presently. "
+
+- `sc_activities_future_preprint`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing preprints in the future."
+
+```{r, results='asis'}
+panderOptions('knitr.auto.asis', FALSE)
+compare_sc_activities("sc_activities_current_preprint",
+                      "sc_activities_future_preprint",
+                      "S4[SQ001][1]",
+                      "S4[SQ001][2]",
+                      borghi_vangulick2020,
+                      results
+                      )
+```
+
+- `sc_activities_current_oa_gold`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing in an open access journal presently"
+
+- `sc_activities_future_oa_gold`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing in an open access journal in the future."
+
+```{r, results='asis'}
+compare_sc_activities("sc_activities_current_oa_gold",
+                      "sc_activities_future_oa_gold",
+                      "S4[SQ002][1]",
+                      "S4[SQ002][2]",
+                      borghi_vangulick2020,
+                      results
+                      )
+```
+
+- `sc_activities_current_oa_green`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for posting author manuscripts presently"
+
+- `sc_activities_future_oa_green`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for posting author manuscripts in the future."
+
+```{r, results='asis'}
+compare_sc_activities("sc_activities_current_oa_green",
+                      "sc_activities_future_oa_green",
+                      "S4[SQ003][1]",
+                      "S4[SQ003][2]",
+                      borghi_vangulick2020,
+                      results
+                      )
+```
+
+- `sc_activities_current_cite_data`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for citing datasets presently. "
+
+- `sc_activities_future_cite_data`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for citing datasets in the future."
+
+```{r, results='asis'}
+compare_sc_activities("sc_activities_current_cite_data",
+                      "sc_activities_future_cite_data",
+                      "S4[SQ004][1]",
+                      "S4[SQ004][2]",
+                      borghi_vangulick2020,
+                      results
+                      )
+```
+
+- `sc_activities_current_cite_code`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for citing code presently. "
+
+- `sc_activities_future_cite_code`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for citing code in the future."
+
+```{r, results='asis'}
+compare_sc_activities("sc_activities_current_cite_code",
+                      "sc_activities_future_cite_code",
+                      "S4[SQ005][1]",
+                      "S4[SQ005][2]",
+                      borghi_vangulick2020,
+                      results
+                      )
+```
+
+
+- `sc_activities_current_data_paper`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing datasets presently. "
+
+- `sc_activities_future_data_paper`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing datasets in the future."
+
+```{r, results='asis'}
+compare_sc_activities("sc_activities_current_data_paper",
+                      "sc_activities_future_data_paper",
+                      "S4[SQ006][1]",
+                      "S4[SQ006][2]",
+                      borghi_vangulick2020,
+                      results
+                      )
+```
+
+- `sc_activities_current_data_mediated`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for making data available to researchers with appropriate expertise presently. "
+
+- `sc_activities_future_data_mediated`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for making data available to researchers with appropriate expertise  in the future."
+
+```{r}
+#compare_sc_activities("sc_activities_current_data_mediate",
+#                      "sc_activities_future_data_mediated",
+#                      "S4[SQ007][1]",
+#                      "S4[SQ007][2]",
+#                      borghi_vangulick2020,
+#                      results
+#                      )
+# NO COUNTS
+```
+
+
+- `sc_activities_current_share_materials`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for sharing non-data research materials presently."
+
+- `sc_activities_future_share_materials`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for sharing non-data research materials in the future."
+
+```{r, results='asis'}
+compare_sc_activities("sc_activities_current_share_materials",
+                      "sc_activities_future_share_materials",
+                      "S4[SQ008][1]",
+                      "S4[SQ008][2]",
+                      borghi_vangulick2020,
+                      results
+                      )
+```
+
+- `sc_activities_current_share_protocol`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for sharing study protocols presently. "
+
+- `sc_activities_future_share_protocol`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for sharing study protocols in the future."
+
+```{r, results='asis'}
+compare_sc_activities("sc_activities_current_share_protocol",
+                      "sc_activities_future_share_protocol",
+                      "S4[SQ009][1]",
+                      "S4[SQ009][2]",
+                      borghi_vangulick2020,
+                      results
+                      )
+```
+
+- `sc_activities_current_preregister`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for preregistering a study presently. "
+
+- `sc_activities_future_preregister`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for preregistering a study in the future."
+
+```{r, results='asis'}
+compare_sc_activities("sc_activities_current_preregister",
+                      "sc_activities_future_preregister",
+                      "S4[SQ010][1]",
+                      "S4[SQ010][2]",
+                      borghi_vangulick2020,
+                      results
+                      )
+```
+
+- `sc_activities_current_register_report`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing a registered report presently. "
+
+- `sc_activities_future_register_report`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing a registered report in the future."
+
+```{r, results='asis'}
+compare_sc_activities("sc_activities_current_register_report",
+                      "sc_activities_future_register_report",
+                      "S4[SQ011][1]",
+                      "S4[SQ011][2]",
+                      borghi_vangulick2020,
+                      results
+                      )
+```
+
+- `sc_activities_current_curation`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for taking advantage of a data curation/RDM service presently. "
+
+- `sc_activities_future_curation`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for taking advantage of a data curation/RDM service in the future."
+
+```{r, results='asis'}
+compare_sc_activities("sc_activities_current_curation",
+                      "sc_activities_future_curation",
+                      "S4[SQ012][1]",
+                      "S4[SQ012][2]",
+                      borghi_vangulick2020,
+                      results
+                      )
+```
+
+- `sc_activities_current_replication`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing a replication presently. "
+
+- `sc_activities_future_replication`,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing a replication in the future."
+
+```{r, results='asis'}
+compare_sc_activities("sc_activities_current_replication",
+                      "sc_activities_future_replication",
+                      "S4[SQ013][1]",
+                      "S4[SQ013][2]",
+                      borghi_vangulick2020,
+                      results
+                      )
+```
+
+## Larsson et al. 2023: QRPs,
+
+```{r}
+library(PASWR2)
+
+qrps = list(
+  "I5[SQ001]" = "Selecting variables out of convenience and/or familiarity when more theoretically grounded variables are available",
+  "I5[SQ002]" = "Fishing for results by collecting information on unnecessary variables",
+  "I5[SQ003]" = "Not being transparent with regard to the reporting on what steps were taken for data cleaning (e.g., removing cases/items without a stated criterion or justification for doing so)",
+  "I5[SQ004]" = "Removing whole items/cases knowingly / purposefully to obtain favorable results",
+  "I5[SQ005]" = "Employing selective reporting of results/instruments",
+  "I5[SQ006]" = "Cherry-picking data to analyze",
+  "I5[SQ007]" = "Not attempting to publish results in a timely manner"
+)
+
+pdf_stats <- data.frame(
+  qrp_id = c("I5[SQ001]", "I5[SQ002]", "I5[SQ003]", "I5[SQ004]", "I5[SQ005]", "I5[SQ006]", "I5[SQ007]"),
+  sev_mean  = c(3.74, 4.09, 4.45, 4.74, 4.21, 4.35, 3.47),
+  sev_sd    = c(1.73, 1.94, 1.91, 1.97, 1.88, 1.96, 1.74),
+  sev_n     = c(190, 182, 188, 187, 185, 182, 183)
+)
+
+qrp_stats <- list()
+for (qrp in names(qrps)){
+  stats <- tidy(tsum.test(
+    mean.x = results %>% pull(qrp) %>% mean(na.rm = T),
+    s.x = results %>% pull(qrp) %>% sd(na.rm = T),          
+    n.x = results %>% pull(qrp) %>% is.na() %>% `!` %>% sum(),
+  mean.y = pdf_stats %>% filter(qrp_id == qrp) %>% pull(sev_mean),
+    s.y = pdf_stats %>% filter(qrp_id == qrp) %>% pull(sev_sd),
+    n.y = pdf_stats %>% filter(qrp_id == qrp) %>% pull(sev_n),
+    alternative = "two.sided", 
+    var.equal = FALSE      
+  ))
+  
+  stats$QRP = qrps[[qrp]]
+  qrp_stats[[qrp]] = stats
+}
+
+bind_rows(qrp_stats) %>% flextable() %>%  autofit() %>% colformat_double()
+```

@@ -1,0 +1,43 @@
+# OS / editors
+.DS_Store
+*~
+*.swp
+
+# R / RStudio
+.Rhistory
+.RData
+.Rproj.user/
+
+# RMarkdown / Pandoc intermediates
+*.knit.md
+*.utf8.md
+*.utf8
+*.aux
+*.log
+*.out
+*.toc
+*.tex
+*_files/
+cache/
+
+# Local scratch
+nohup.out
+
+# Working documents (keep local, do not publish)
+02_RESULTS/CORRECTIONS*.md
+02_RESULTS/EXPLORATORY_ANALYSES.md
+02_RESULTS/\[SZUFLADA\]*
+
+# Raw survey exports (public release uses 02_RESULTS/data_public/)
+02_RESULTS/results-survey*.csv
+
+# Public repo keeps HTML + PDF reports only
+02_RESULTS/*.docx
+
+# External reference datasets (keep only the CSVs + small text docs)
+02_RESULTS/borghi_vangulick_2018/*.zip
+02_RESULTS/borghi_vangulick_2020/*.zip
+02_RESULTS/borghi_vangulick_2020/*.ipynb
+02_RESULTS/borghi_vangulick_2020/*.docx
+02_RESULTS/borghi_vangulick_2020/*.pdf
+02_RESULTS/borghi_vangulick_2020/*.html

@@ -1,0 +1,384 @@
+﻿variable_name,description
+subject_id,Internal identification number assigned to each participant.
+title,"Response to the question ""What is your current professional title or role?"""
+title_other_text,"Free text response entered for participants who responded ""other"" for their professional title."
+years,"Free text response entered for participants who responded ""other"" for their professional title."
+institution_type,"Response to the question ""Which of the following best describes the institution or organization with which you are affiliated?"""
+institution_type_other_text,"Free text response entered for participants who responded ""other"" for their institution type."
+country,"Response to the question ""In what country is your current institution or organization located?"""
+lab_size,"Whether or not the participant answered the question ""How big is your lab or research group?"" [1=Yes]"
+lab_size_total,"Total of responses given to the question ""How big is your lab or research group?"""
+lab_size_ra,Free text response entered for number of research assistants in the participant's lab group.
+lab_size_gs,Free text response entered for number of grad students in the participant's lab group.
+lab_size_pd,Free text response entered for number of postdocs in the participant's lab group.
+lab_size_fts,Free text response entered for number of full time staff in the participant's lab group.
+lab_size_pts,Free text response entered for number of part time staff in the participant's lab group.
+collaboration,"Response to the question ""Aside from your own, approximately how many labs or research groups are you currently collaborating with in a way that involves sharing data?'"
+research_area,"Response to the question ""What is your primary research area?"""
+research_area_text,"Free text response entered for participants who responded ""other"" for their research area."
+data_type,"Response to the question ""Which of the following best describes the data you collect as part of your research?"""
+funder,"Indicates whether or not participant answered the question ""Who currently funds your research or work?"" [1=Yes]"
+funder_nih,If the participant indicated they currently receive NIH funding. [1=Yes]
+funder_nsf,If the participant indicated they currently receive NSF funding. [1=Yes]
+funder_government,If the participant indicated they currently receive funding from a government funder other than NIH or NSF. [1=Yes]
+funder_private,If the participant indicated they currently receive funding from a foundation or private funder. [1=Yes]
+funder_professional,If the participant indicated they currently receive funding from a profession organization. [1=Yes]
+funder_commercial,If the participant indicated they currently receive funding from a commercial entity. [1=Yes]
+funder_internal,If the participant indicated they currently receive funding from their institution. [1=Yes]
+funder_other,If the participant indicated they currently receive funding from another source. [1=Yes]
+funder_none,If the participant indicated they currently receive no funding. [1=Yes]
+funder_other_text,"Free text response entered for participants who responded that they received ""other"" funding. [1=Yes]"
+funder_role,"Indicates whether or not participant answered the question ""What is your role on these grants?"""
+funder_role_pi,If the participant indicated they are a primary investigator on their grants. [1=Yes]
+funder_role_ci,If the participant indicated they are a co-investigator on their grants. [1=Yes]
+funder_role_associate,If the participant indicated they are listed as a research associate on their grants. [1=Yes]
+funder_role_consultant,If the participant indicated they are listed as a consultant on their grants. [1=Yes]
+funder_role_pd,If the participant indicated they are listed as  postdoc on their grants. [1=Yes]
+funder_role_gs,If the participant indicated they are listed as a grad student on their grants. [1=Yes]
+funder_role_ug,If the participant indicated they are listed as a PI on their grants. [1=Yes]
+funder_role_na,If the participant indicated the question about funding role did not apply to them.  [1=Yes]
+funder_role_other,If the participant indicated they have another role on their grants. [1=Yes]
+funder_role_other_text,"Free text response entered for participants who indicated their role on their grants was ""other""."
+dmp,"Response to the question ""Have you ever written a Data Management Plan (DMP) as part of a grant or project proposal?"""
+education_method,"If the participant answered the question ""From what sources have you received education or training related to research design and/or research methods?"" [1=Yes]"
+education_methods_courses_school,If the participant indicated that they received methods training from courses at their own insitution. [1=Yes]
+education_methods_courses_other,If the participant indicated that they received methods training from courses at an insitution other than their own. [1=Yes]
+education_methods_best_practices_psych,If the participant indicated that they received methods training from best practices written by people within the field of psychology . [1=Yes]
+education_methods_best_practices_other,If the participant indicated that they received methods training from best practices written by people outside of psychology. [1=Yes]
+education_methods_person_collab,If the participant indicated that they received methods training from researchers they collaborate with. [1=Yes]
+education_methods_person_other,"If the participant indicated that they received methods training from other researchers, that they don't collaborate with. [1=Yes]"
+education_methods_social_media,If the participant indicated that they received methods training from social media. [1=Yes]
+education_methods_self,If the participant indicated that they received methods training through self teaching. [1=Yes]
+education_methods_other,If the participant indicated that they received methods training from a source other than those listed. [1=Yes]
+education_methods_none,If the participant indicated that they have received no methods training. [1=Yes]
+education_methods_other_text,Free text response entered for participants who received their methods training from a source other than those listed.
+education_management,"If the participant answered the question ""From what sources have you received education or training related to research data management?"" [1=Yes]"
+education_management_courses_school,If the participant indicated that they received RDM training from courses at their own insitution. [1=Yes]
+education_management_courses_other,If the participant indicated that they received RDM training from courses at an insitution other than their own. [1=Yes]
+education_management_best_practices_psych,If the participant indicated that they received RDM training from best practices written by people within the field of psychology . [1=Yes]
+education_management_best_practices_other,If the participant indicated that they received RDM training from best practices written by people outside of psychology. [1=Yes]
+education_management_person_collab,If the participant indicated that they received RDM training from researchers they collaborate with. [1=Yes]
+education_management_person_other,"If the participant indicated that they received RDM training from other researchers, that they don't collaborate with. [1=Yes]"
+education_management_social_media,If the participant indicated that they received RDM training from social media. [1=Yes]
+education_management_self,If the participant indicated that they received RDM training through self teaching. [1=Yes]
+education_management_other,If the participant indicated that they received RDM training from a source other than those listed. [1=Yes]
+education_management_none,If the participant indicated that they have received no RDM training. [1=Yes]
+education_management_other_text,Free text response entered for participants who received their RDM training from a source other than those listed.
+institution_resource_rdm,"Participant's response to the portion of the question ""Does your current organization or institution provide any of the following?"" that pertains to data management-related services."
+institution_resource_sharing,"Participant's response to the portion of the question ""Does your current organization or institution provide any of the following?"" that pertains to data sharing-related services."
+institution_resource_it,"Participant's response to the portion of the question ""Does your current organization or institution provide any of the following?"" that pertains to information technology-related services."
+limits_time,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following - The amount of time it takes""."
+limits_cost,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following - The financhial cost""."
+limits_norms,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following - Lack of norms or best practices""."
+limits_training,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following - Lack of training""."
+limits_incentives,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following - Lack of professional incentives""."
+limits_support,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following - Lack of insitutional support""."
+limits_guidance,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following - Lack of guidance from PI/collaborators""."
+limits_pi,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following - My PI requires I manage my data a certain way""."
+limits_data,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following - The characteristics of my data""."
+limits_knowldge,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following - Lack of knowledge""."
+motivations_loss,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following -  Prevent the loss of data"""
+motivations_continuity,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following -  Ensure continuity as research team changes"""
+motivations_compliance_funding,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following -  Compliance with mandates from funder/publisher"""
+motivations_compliance_ethics,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following -  Compliance with legal/ethical frameworks"""
+motivations_guidance,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following -  Availability of guidance of best practices"""
+motivations_training,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following -  Availability of training"""
+motivations_best_practice,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following -  Awareness of best practices"""
+motivations_support,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following -  Institutional support"""
+motivations_pi,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following -  Guidance from PI/Collaborators"""
+motivations_transparency,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following -  Desire to foster research transparency"""
+motivations_reproducibility,"Response to the question ""On a scale of 1 (Not limited) to 5 (Very limited), how much are your current data management practices limited by each of the following -  Desire to foster reproducibility"""
+collect_mature_self,"Response to ""On a scale of 1-5, how would you rate the overall maturity of your data management practices during the data collection phase of a project?"""
+collect_mature_field,"Response to ""On a scale of 1-5, how would you rate the data management practices for the field of psychology as a whole during the data collection phase of a project?"""
+collect_change,"Response to ""On a scale of 1-5, how would you rate your willingness to change your data management practices during the data collection phase of a project in response to new technologies, opportunities, or requirements?"""
+collect_how,"Whether the participant answered the question ""Which of the following describes how you collect data from human participants?"""
+collect_how_lab,If the participant indicated that participants come to their lab. [1=Yes]
+collect_how_travel,If the participant indicated that they travel to their participants to collect data. [1=Yes]
+collect_how_send,If the participant indicated that they send participants materials which they return to them. [1=Yes]
+collect_how_internet,If the participant indicated that they collect data via the internet. [1=Yes]
+collect_how_prompt,If the participant indicated that they prompt participants to enter data. [1=Yes]
+collect_how_secondary,If the participant indicated that they examine data collected by others. [1=Yes]
+collect_how_other,If the participant indicated that they collect data through some other means. [1=Yes]
+collect_how_other_text,"Free text response entered by participants who entered ""other"" for how they collect data."
+collect_vulnerable,"Response to the question ""Do the participants in your research include members of a “vulnerable” or “special” population?"""
+collect_software,"Whether the participant answered the question ""What software tools do you use to build experiments, ask questions, or collect data from your participants?"" [1=Yes]"
+collect_software_eprime,If the participant indicated that they collect data using E-Prime. [1=Yes]
+collect_software_builder,If the participant indicated that they collect data using Experiment Builder. [1=Yes]
+collect_software_inquisit,If the participant indicated that they collect data using Inquisit. [1=Yes]
+collect_software_presentation,If the participant indicated that they collect data using Presentation. [1=Yes]
+collect_software_psychopy,If the participant indicated that they collect data using Psychopy. [1=Yes]
+collect_software_matlab,If the participant indicated that they collect data using Matlab. [1=Yes]
+collect_software_redcap,If the participant indicated that they collect data using Redcap. [1=Yes]
+collect_software_qualtrics,If the participant indicated that they collect data using Qualtrics. [1=Yes]
+collect_software_custom,If the participant indicated that they collect data using custom code. [1=Yes]
+collect_software_other,If the participant indicated that they collect data using another software tool. [1=Yes]
+collect_software_none,If the participant indicated that they don't collect data using a software tool. [1=Yes]
+collect_software_other_text,"Free text response entered by participants who entered ""other"" for the tool(s) they use to collect data."
+collect_data,"Indicates whether or not the participant answered the question "" What type of data do you collect from your participants?"" [1=Yes]"
+collect_data_av,If the participant indicated they collect audio/visual recordings. [1=Yes]
+collect_data_demographics,If the participant indicated they collect demographic data. [1=Yes]
+collect_data_clinical,If the participant indicated they collect clinical or medical data. [1=Yes]
+collect_data_scales_quantitative,If the participant indicated they collect quantitative data from questionnaires. [1=Yes]
+collect_data_scales_qualitative,If the participant indicated they collect qualitative data from questionnaires. [1=Yes]
+collect_data_behavioral,If the participant indicated they collect behavioral data. [1=Yes]
+collect_data_qualitative,If the participant indicated they collect qualitative data. [1=Yes]
+collect_data_neurpsych,If the participant indicated they collect neurophysiological data. [1=Yes]
+collect_data_neuroimaging,If the participant indicated they collect neuroimaging data. [1=Yes]
+collect_data_writing,If the participant indicated they collect  data from written documents. [1=Yes]
+collect_data_physiology,If the participant indicated they collect physiological data. [1=Yes]
+collect_data_genetic,If the participant indicated they collect genetic or molecular data. [1=Yes]
+collect_data_eye_tracking,If the participant indicated they collect eye tracking data. [1=Yes]
+collect_data_other,If the participant indicated they collect data in a format not otherwise listed. [1=Yes]
+collect_data_other_text,"Free text response entered by participants who entered ""other"" for the form of data they collect. [1=Yes]"
+collect_information,"Whether the participant answered the question ""What additional information do you need to preserve for a research project that is connected to the data collected from your participants?"" [1=Yes]"
+collect_information_session,If the participant needs to save information about the data collection session. [1=Yes]
+collect_information_paradigm,If the participant needs to save  research protocol/paradigm-related information. [1=Yes]
+collect_information_stimuli,If the participant needs to save research-related stimuli alongside their data. [1=Yes]
+collect_information_text,"If the participant needs to save the text of questionnaires, scales, etc alongside their data.  [1=Yes]"
+collect_information_scripts,If the participant needs to save code used for data collection alongside their data. [1=Yes]
+collect_information_coding,If the participant needs to save coding materials alongside their data.  [1=Yes]
+collect_information_consent,If the participant needs to save informated consent-related information alongside their data. [1=Yes]
+collect_information_other,If the participant needs to save other information alongside their data alongside their data. [1=Yes]
+collect_information_other_text,"Free text response entered by participants who entered ""other"" for additional information they need to save alongside their data. [1=Yes]"
+collect_code,"Whether the participant answered the question ""Have you ever deposited data collection-related computer code, syntax, or software somewhere so that it can be shared (e.g. code used to present stimuli and/or collect behavioral responses)"" [1=Yes]"
+collect_code_ir,If the participant indicated they have deposited data collection-related code in an institutional repository. [1=Yes]
+collect_code_github,If the participant indicated they have deposited data collection-related code in a software-specific hosting service. [1=Yes]
+collect_code_osf,If the participant indicated they have deposited data collection-related code in the Open Science Framework. [1=Yes]
+collect_code_repo,If the participant indicated they have deposited data collection-related code in a general purpose repository. [1=Yes]
+collect_code_article,If the participant indicated they have deposited data collection-related code in a journal article. [1=Yes]
+collect_code_website,If the participant indicated they have deposited data collection-related code on a website. [1=Yes]
+collect_code_other,If the participant indicated that they have deposited data collection-related code in another location. [1=Yes]
+collect_code_none,If the participant indicated that they have not deposited data collection-related code so that it can be shared. [1=Yes]
+collect_code_other_text,"Free text response entered by participants who entered ""other"" for where that have deposited data collection-related code so that it can be shared. [1=Yes]"
+collect_storage,"Whether the participant answered the question ""Which of the following describes how you store and analyze your data?"" [1=Yes]"
+collect_storage_own_both,If the participant indicated they use their own machines to store and analyze their data. [1=Yes]
+collect_storage_own_analysis,If the participant indicated they use their own machine to analyze data but store it on a shared drive. [1=Yes]
+collect_storage_workstation,If the participant indicated they use a shared workstation that they analyze and store their data. [1=Yes]
+collect_storage_server,If the participant indicated they use a shared server or cluster to analyze and store data. [1=Yes]
+collect_storage_none,If the participant indicated they do not analyze or store their data electronically. [1=Yes]
+collect_storage_other,If the participant indicated that they use other methods for analyzing and storing their data. [1=Yes]
+collect_storage_other_text,"Free text response entered by participants who entered ""other"" for how they analyze and store data. [1=Yes]"
+collect_organize,"Whether the participant answered the question ""What system(s) do you use to keep your raw digital files/data organized?"" [1=Yes]"
+collect_organize_names,If the participant indicated that they use standandardized file names to organize their data. [1=Yes]
+collect_organize_structures,If the participant indicated that they use standandardized file organizational schemes to organize their data. [1=Yes]
+collect_organize_notebook,"If the participant indicated that they use lab notebooks, data dictionaries, or codebooks to organize their data. [1=Yes]"
+collect_organize_general,"If the participant indicated that they have general procedures for organizing their data, but they are not recorded anywhere. [1=Yes]"
+collect_organize_none,If the participant indicated that they do not have a system for organizing their data. [1=Yes]
+collect_organize_na,If the participant indicated that this question does not apply to them. [1=Yes]
+collect_organize_other,If the participant indicated that they use other methods to organize their data. [1=Yes]
+collect_organize_other_text,"Free text response entered by participants who entered ""other"" for how they organize their data. [1=Yes]"
+collect_organize_lab,"Response to the question ""Does everyone in your lab or research group use similar system(s) for organizing their raw digital files/data?"" [1=Yes]"
+collect_backup,"Whether the participant answered the question ""How do you backup or secure your digital files/data?"" [1=Yes]"
+collect_backup_digitize,If the participant indicated that they backup their data by digitizing non-digital data. [1=Yes]
+collect_backup_cabinet,If the participant indicated that they backup their data by storing non-digital data in a secure location. [1=Yes]
+collect_backup_hard_drive,If the participant indicated that they backup their data using an electronic hard drive. [1=Yes]
+collect_backup_backup_manual,If the participant indicated that they backup their data by manually backing up their local machine. [1=Yes]
+collect_backup_backup_automatic,If the participant indicated that they backup their data by automatically backing up their local machine. [1=Yes]
+collect_backup_server_lab,If the participant indicated that they backup their data using a lab owned server. [1=Yes]
+collect_backup_server_department,If the participant indicated that they backup their data using a department server. [1=Yes]
+collect_backup_server_institution,If the participant indicated that they backup their data using an institutional server. [1=Yes]
+collect_backup_cloud,If the participant indicated that they backup their data by uploading to the cloud. [1=Yes]
+collect_backup_ir,If the participant indicated that they backup their data by deposited it in an institutional repository. [1=Yes]
+collect_backup_other,If the participant indicated that they backup their data through other means. [1=Yes]
+collect_backup_none,If the participant indicated that they do not back up their data. [1=Yes]
+collect_backup_other_text,"Free text response entered by participants who entered ""other"" for how they backup their data. [1=Yes]"
+collect_backup_lab,"Response to the question ""Does everyone in your lab or research group use similar system(s) for backing up their digital files/data?""."
+collect_backup_copy,"Response to the question ""How many backup copies do you keep of your digital files/data?""."
+collect_education_dmp,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Completing a data management plan""."
+collect_education_storing,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - best practices for storing or backing up data""."
+collect_education_security,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Ensuring the security of sensitive data""."
+collect_education_organizing,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - organizing data""."
+collect_education_documenting,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - documenting data""."
+analyze_mature_self,"Response to ""On a scale of 1-5, how would you rate the overall maturity of your data management practices during the data analysis phase of a project?"""
+analyze_mature_field,"Response to ""On a scale of 1-5, how would you rate the data management practices for the field of psychology as a whole during the data analysis phase of a project?"""
+analyze_change,"Response to ""On a scale of 1-5, how would you rate your willingness to change your data management practices during the data analysis phase of a project in response to new technologies, opportunities, or requirements?"""
+analyze_tools_taught,"Indicates if the participant answered the question ""If you received formal training in statistics and/or data analysis, what software tools were you taught how to use?"". [1=Yes]"
+analyze_tools_taught_excel,If the participant was taught to use Excel. [1=Yes]
+analyze_tools_taught_jasp,If the participant was taught to use JASP. [1=Yes]
+analyze_tools_taught_jamovi,If the participant was taught to use Jamovi. [1=Yes]
+analyze_tools_taught_lisrel,If the participant was taught to use LISREL. [1=Yes]
+analyze_tools_taught_literate,If the participant was taught to use literate programming tools. [1=Yes]
+analyze_tools_taught_matlab,If the participant was taught to use Matlab. [1=Yes]
+analyze_tools_taught_mplus,If the participant was taught to use Mplus. [1=Yes]
+analyze_tools_taught_python,If the participant was taught to use Python. [1=Yes]
+analyze_tools_taught_sas,If the participant was taught to use SPSS. [1=Yes]
+analyze_tools_taught_spss,If the participant was taught to use SAS. [1=Yes]
+analyze_tools_taught_stata,If the participant was taught to use STATA. [1=Yes]
+analyze_tools_taught_systat,If the participant was taught to use Systat. [1=Yes]
+analyze_tools_taught_r,If the participant was taught to use R. [1=Yes]
+analyze_tools_taught_other,If the participant was taught to use other tools. [1=Yes]
+analyze_tools_taught_no_tools,If the participant was not taught to use any tools. [1=Yes]
+analyze_tools_taught_no_training,If the participant received no formal training in the use of data analysis/stats software tools. [1=Yes]
+analyze_tools_taught_other_text,"Free text response entered by participants who entered ""other"" for the software tools they were taught to use. [1=Yes]"
+analyze_tools_use,"Indicates the participant answered the question ""What software tools do you currently use to analyze your data?"" [1=Yes]"
+analyze_tools_use_excel,If the participant indicated they currently use Excel. [1=Yes]
+analyze_tools_use_jasp,If the participant indicated they currently use JASP. [1=Yes]
+analyze_tools_use_jamovi,If the participant indicated they currently use Jamovia. [1=Yes]
+analyze_tools_use_lisrel,If the participant indicated they currently use Lisrel. [1=Yes]
+analyze_tools_use_literate,If the participant indicated they currently use literate programming tools. [1=Yes]
+analyze_tools_use_matlab,If the participant indicated they currently use Matlab. [1=Yes]
+analyze_tools_use_mplus,If the participant indicated they currently use Mplus. [1=Yes]
+analyze_tools_use_python,If the participant indicated they currently use Matlab. [1=Yes]
+analyze_tools_use_sas,If the participant indicated they currently use SAS. [1=Yes]
+analyze_tools_use_spss,If the participant indicated they currently use SPSS. [1=Yes]
+analyze_tools_use_stata,If the participant indicated they currently use STATA. [1=Yes]
+analyze_tools_use_systat,If the participant indicated they currently use Systat. [1=Yes]
+analyze_tools_use_r,If the participant indicated they currently use R. [1=Yes]
+analyze_tools_use_other,If the participant indicated they currently use another software tool. [1=Yes]
+analyze_tools_use_no_tools,If the participant indicated they currently do not use software tools to analyze their data. [1=Yes]
+analyze_tools_use_other_text,"Free text response entered by participants who entered ""other"" for the software tools they currently use. [1=Yes]"
+analyze_tools_lab,"Response to ""Does everyone in your lab or research group use the same software tools to analyze their data?"""
+analyze_tools_vc,"Response to ""Do you use the same version(s) of software or tools to analyze data throughout the complete duration of a specific project? ""."
+analyze_code,"Response to ""Do you create or adapt custom computer code or scripts in order to analyze data?""."
+analyze_code_shared,"Indicates if the participant answered the question ""Have you ever deposited data analysis-related computer code, syntax, or software somewhere so that it can be shared?"". [1=Yes]"
+analyze_code_shared_ir,If the participant indicated they have shared code through an institutional repository. [1=Yes]
+analyze_code_shared_github,If the participant indicated they have shared code through Github. [1=Yes]
+analyze_code_shared_osf,If the participant indicated they have shared code through OSF. [1=Yes]
+analyze_code_shared_repo,If the participant indicated they have shared code through a general purpose repository. [1=Yes]
+analyze_code_shared_article,If the participant indicated they have shared code as part of a journal article. [1=Yes]
+analyze_code_shared_website,If the participant indicated they have shared code through a website. [1=Yes]
+analyze_code_shared_other,If the participant indicated they have shared code through other means. [1=Yes]
+analyze_code_shared_none,If the participant indicated they have not shared code. [1=Yes]
+analyze_code_shared_other_text,"Free text response entered by participants who entered ""other"" for how they have shared code. [1=Yes]"
+analyze_docs,"If the participant answered the question ""How do you typically document your activities during the data analysis phase of a project?"". [1=Yes]"
+analyze_docs_paper,If the participant indicated they document their activities using a physical notebook or paper. [1=Yes]
+analyze_docs_word,If the participant indicated they document their activities using a word processing program. [1=Yes]
+analyze_docs_project_management,If the participant indicated they document their activities using project management tools. [1=Yes]
+analyze_docs_eln,If the participant indicated they document their activities using an electronic lab notebook. [1=Yes]
+analyze_docs_literate,If the participant indicated they document their activities using literate programming tools. [1=Yes]
+analyze_docs_vc,If the participant indicated they document their activities using a version control system. [1=Yes]
+analyze_docs_wiki,If the participant indicated they document their activities using a wiki. [1=Yes]
+analyze_docs_readme,If the participant indicated they document their activities using readme files. [1=Yes]
+analyze_docs_none,If the participant indicated they do not document their activities. [1=Yes]
+analyze_docs_other,If the participant indicated they document their activities using other means. [1=Yes]
+analyze_docs_other_text,"Free text response entered by participants who entered ""other"" for how they document their activities."
+analyze_docs_lab,"Response to ""Does everyone in the lab use similar system(s) for documenting their activities during the data analysis phase of a project?""."
+analyze_docs_others,"Response to ""Do you believe someone with a similar level of expertise could recreate your data analysis steps from the documentation and notes your create as you are analyzing your data (without you being present)?""."
+analyze_education_methods,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Research design/methods""."
+analyze_education_tools,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Use of software tools""."
+analyze_education_organizing,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Organizing data for analysis""."
+analyze_education_documenting,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Documenting analysis decisions	""."
+analyze_education_sharing,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Sharing code in a useful manner""."
+share_mature_self,"Response to ""On a scale of 1-5, how would you rate the overall maturity of your data management practices during the data sharing phase of a project?"""
+share_mature_field,"Response to ""On a scale of 1-5, how would you rate the data management practices for the field of psychology as a whole during the data sharing phase of a project?"""
+share_change,"Response to ""On a scale of 1-5, how would you rate your willingness to change your data management practices during the data sharing phase of a project in response to new technologies, opportunities, or requirements?"""
+share_cant,"If the participant answered the question ""Is there any reason part or all of your data cannot be shared?"". [1=Yes]"
+share_cant_publish,If the participant indicated they can't share their data because it contains findings they still want to publish. [1=Yes]
+share_cant_sensitive,If the participant indicated they can't share their data because it contains sensitive information. [1=Yes]
+share_cant_irb,If the participant indicated they can't share their data because of lack of IRB approval to share. [1=Yes]
+share_cant_format,If the participant indicated they can't share their data because it is in a format that makes it difficult to share. [1=Yes]
+share_cant_ip,If the participant indicated they can't share their data because of IP related concerns. [1=Yes]
+share_cant_pi,If the participant indicated they can't share their data because their PI or collaborators do not want to share. [1=Yes]
+share_cant_time,If the participant indicated they can't share their data because it would take too much time. [1=Yes]
+share_cant_knowledge,If the participant indicated they can't share their data because they don't know how to share it effectively. [1=Yes]
+share_cant_other,If the participant indicated they can't share their data because of other reasons. [1=Yes]
+share_cant_no_authorship,If the participant indicated they can share their data but require co-authorship. [1=Yes]
+share_cant_no_citation,If the participant indicated they can't share their data because they don't know how to share it effectively. [1=Yes]
+share_cant_other_text,"Free text response entered by participants who entered ""other"" for why they can't share their data."
+share_archive,"If the participant answered the question ""Have you ever archived, deposited, or published a dataset in order to make it available to others?"". [1=Yes]"
+share_archive_article,If the participant indicated that they have shared data as part of a journal article. [1=Yes]
+share_archive_repo_government,If the participant indicated that they have shared data through a government or funder sponsored repository. [1=Yes]
+share_archive_OSF,If the participant indicated that they have shared data through the OSF. [1=Yes]
+share_archive_repo_other,If the participant indicated that they have shared data through a general purpose repository other than the OSF. [1=Yes]
+share_archive_repo_disclipline,If the participant indicated that they have shared data through a discipline specific repository. [1=Yes]
+share_archive_repo_ir,If the participant indicated that they have shared data through an institutional repository. [1=Yes]
+share_archive_other,If the participant indicated that they have shared data through other means. [1=Yes]
+share_archive_none,If the participant indicated that they have not shared data. [1=Yes]
+share_archive_other_text,"Free text response entered by participants who entered ""other"" for how they have shared data."
+share_motivation,"If the participant answered the question ""If applicable, what is your motivation for sharing your data (such as through uploading some or all of it to a general or discipline-specific repository)?"". [1=Yes]"
+share_motivation_results,If the participant indicated that they are motivated to share data in order to communicate their results. [1=Yes]
+share_motivation_validity,If the participant indicated that they are motivated to share data to allow other researchers to verify their claims. [1=Yes]
+share_motivation_incentives,If the participant indicated that they are motivated to share data by professional incentives. [1=Yes]
+share_motivation_ip,If the participant indicated that they are motivated to share data to establish IP claims. [1=Yes]
+share_motivation_mandate,"If the participant indicated that they are motivated to share data because it is mandated by a funder, publisher, or their institution. [1=Yes]"
+share_motivation_transparency,If the participant indicated that they are motivated to share data to foster transparency and reproducibility. [1=Yes]
+share_motivation_reuse,If the participant indicated that they are motivated to share data to foster reuse. [1=Yes]
+share_motivation_other,If the participant indicated that they are motivated to share data for other reasons. [1=Yes]
+share_motivation_na,If the participant indicated that the question about motivations for data sharing does not apply to them. [1=Yes]
+share_motivation_other_text,"Free text response entered by participants who entered ""other"" for why the have shared data."
+share_publisher,"Response to the question ""Have you ever published in a journal that required you to share data or complete a data availability statement upon publication of your article?""."
+share_request,"Response to the question ""Have you ever requested data associated with a paper or other scholarly publication from another researcher?""."
+share_request_usable,"Response to the question ""On a scale of 1 to 5 how often have you received such data in a form that was usable without a significant amount of effort?""."
+share_receive,"Response to the question ""Have you ever received a request for data associated with one of your papers or scholarly publications?""."
+share_receive_usable,"Response to the question ""On a scale of 1 to 5 how often have you been able to send the requested data in a usable form without a significant amount of effort?""."
+share_use,"If the participant answered the question ""If you have requested data from another researcher or sought openly accessible data, what did you use it for?"". [1=Yes]"
+share_use_replicate,If the participant indicated that they have requested data to verify or replicate results. [1=Yes]
+share_use_meta,If the participant indicated that they have requested data as part of creating a meta-analysis. [1=Yes]
+share_use_extend,If the participant indicated that they have requested data to extend conclusions drawn from it. [1=Yes]
+share_use_test,"If the participant indicated that they have requested data to learn new techniques, methods, or tools. [1=Yes]"
+share_use_none,If the participant indicated that they have requested data but did not end up using it. [1=Yes]
+share_use_other,If the participant indicated that they have requested data for another reason. [1=Yes]
+share_use_na,If the participant indicated that the question about why they have requested data does not apply to them. [1=Yes]
+share_use_other_text,"Free text response entered by participants who entered ""other"" for why the have requested data."
+share_docs_others,"Response to ""In general, do you believe that someone with a similar level of expertise could recreate your analysis steps using your description of them in a publication or scholarly report (without you being present)?""."
+share_preserve_time,"Response to ""How long do you (or your lab) typically keep a dataset?""."
+share_preserve_time_text,"Free text response entered by participants who entered ""other"" for how long they keep a dataset."
+share_preserve_what,"If the participant answered the question ""What are the important components of your research to preserve long term (after the conclusion of a project)"". [1=Yes]"
+share_preserve_what_av,If the participant indicated that they need to preserve audio/visual recordings. [1=Yes]
+share_preserve_what_demographic,If the participant indicated that they need to preserve demographic data. [1=Yes]
+share_preserve_what_medical,If the participant indicated that they need to preserve clinical or medical data. [1=Yes]
+share_preserve_what_scales_quantitative,If the participant indicated that they need to preserve quantitative data from questionnaires. [1=Yes]
+share_preserve_what_scales_qualitative,If the participant indicated that they need to preserve qualitative data from questionnaires. [1=Yes]
+share_preserve_what_behavioral,If the participant indicated that they need to preserve behavioral data. [1=Yes]
+share_preserve_what_qualitative,If the participant indicated that they need to preserve qualitative data. [1=Yes]
+share_preserve_what_neurphysiological,If the participant indicated that they need to preserve neuropsychological or aptitude tests. [1=Yes]
+share_preserve_what_neuroimaging,If the participant indicated that they need to preserve neuroimaging data. [1=Yes]
+share_preserve_what_writing,If the participant indicated that they need to preserve data from written documents. [1=Yes]
+share_preserve_what_physiological,If the participant indicated that they need to preserve physiological data. [1=Yes]
+share_preserve_what_genetic,If the participant indicated that they need to preserve genetic or molecular data. [1=Yes]
+share_preserve_what_eye_tracking,If the participant indicated that they need to preserve eye tracking data. [1=Yes]
+share_preserve_what_session,If the participant indicated that they need to preserve information about the data collection session. [1=Yes]
+share_preserve_what_paradigm,If the participant indicated that they need to preserve task-related information. [1=Yes]
+share_preserve_what_stimuli,If the participant indicated that they need to preserve task-related stimuli. [1=Yes]
+share_preserve_what_code_collection,If the participant indicated that they need to preserve code used for data collection. [1=Yes]
+share_preserve_what_schemes,If the participant indicated that they need to preserve coding materials. [1=Yes]
+share_preserve_what_consent,If the participant indicated that they need to preserve informed consent documents. [1=Yes]
+share_preserve_what_other,If the participant indicated that they need to preserve other things. [1=Yes]
+share_preserve_what_other_text,"Free text response entered by participants who entered ""other"" for what materials they need to preserve over the long term. "
+share_education_useful,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Sharing data in a form that ensures it will be useful to others""."
+share_education_platforms,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Use of different platforms, repositories, or tools for sharing data""."
+share_education_confidentiality,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Protecting participant confidentiality in shared data""."
+share_education_reuse,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Understanding reuse rights related to data""."
+share_education_archiving,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Best practices for preserving or archiving data over the long term""."
+sc_publish,"Indicates if the participant answered the question ""What is your motivation for publishing a scholarly article that describes conclusions drawn from your data (such as a peer-reviewed journal article)?"" [1=Yes]"
+sc_publish_communicate,If the participant they are motivated to publish to communicate their results and/or add to the scholarly literature. [1=Yes]
+sc_publish_validity,If the participant they are motivated to publish to allow other researchers to assess the validity of their conclusions. [1=Yes]
+sc_publish_incentives,If the participant they are motivated to publish by professional incentives. [1=Yes]
+sc_publish_ip,If the participant they are motivated to publish to establish IP or patent claims. [1=Yes]
+sc_publish_funder,If the participant they are motivated to publish because it is expected by their funder. [1=Yes]
+sc_publish_employer,If the participant they are motivated to publish because it is expected by their employer. [1=Yes]
+sc_publish_other,If the participant they are motivated to publish for other reasons. [1=Yes]
+sc_publish_other_describe,"Free text entered by participants who entered ""other"" reasons for why they publish articles. [1=Yes]"
+sc_limited,"Response to the question ""Are you limited in addressing your research questions by a lack of access to research data collected by others""."
+sc_firstclass,"Response to the question ""Are you limited in addressing your research questions by a lack of access to research data collected by others""."
+sc_activities_current_preprint,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing preprints presently. "
+sc_activities_current_oa_gold,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing in an open access journal presently"
+sc_activities_current_oa_green,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for posting author manuscripts presently"
+sc_activities_current_cite_data,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for citing datasets presently. "
+sc_activities_current_cite_code,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for citing code presently. "
+sc_activities_current_data_paper,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing datasets presently. "
+sc_activities_current_data_mediated,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for making data available to researchers with appropriate expertise presently. "
+sc_activities_current_share_materials,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for sharing non-data research materials presently."
+sc_activities_current_share_protocol,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for sharing study protocols presently. "
+sc_activities_current_preregister,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for preregistering a study presently. "
+sc_activities_current_register_report,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing a registered report presently. "
+sc_activities_current_curation,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for taking advantage of a data curation/RDM service presently. "
+sc_activities_current_replication,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing a replication presently. "
+sc_activities_future_preprint,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing preprints in the future."
+sc_activities_future_oa_gold,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing in an open access journal in the future."
+sc_activities_future_oa_green,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for posting author manuscripts in the future."
+sc_activities_future_cite_data,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for citing datasets in the future."
+sc_activities_future_cite_code,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for citing code in the future."
+sc_activities_future_data_paper,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing datasets in the future."
+sc_activities_future_data_mediated,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for making data available to researchers with appropriate expertise  in the future."
+sc_activities_future_share_materials,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for sharing non-data research materials in the future."
+sc_activities_future_share_protocol,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for sharing study protocols in the future."
+sc_activities_future_preregister,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for preregistering a study in the future."
+sc_activities_future_register_report,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing a registered report in the future."
+sc_activities_future_curation,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for taking advantage of a data curation/RDM service in the future."
+sc_activities_future_replication,"Response to ""Please indicate if you are currently doing any of the following activities as well as if you and if you plan do any in the future."" for publishing a replication in the future."
+sc_education_oa,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Open access publishing""."
+sc_education_preregister,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Preregistering studies""."
+sc_education_tools,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Using open science software tools""."
+sc_education_practices,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Applying open science practices""."
+sc_education_datasets,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Finding and using openly available datasets""."

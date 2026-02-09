@@ -1,0 +1,1368 @@
+---
+title: "Exploratory analyses: relationships in the file drawer survey"
+output:
+  pdf_document:
+    latex_engine: lualatex
+  html_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+```{r message=FALSE, include=FALSE}
+library(rlang)
+library(tidyverse)
+library(ggpubr)
+library(flextable)
+library(pander)
+library(stringr)
+library(broom)
+library(psych)
+
+set_flextable_defaults(digits = 2)
+knitr::opts_chunk$set(echo = FALSE, warning = FALSE, message = FALSE)
+```
+
+This document is **hypothesis-generating**. It searches for potentially interesting relationships:
+
+- between *demographic/career variables* (D*) and *variables of interest* (R*, I*, S*, H*, M*)
+- among *variables of interest* (e.g., awareness → uptake; barriers → uptake)
+
+Given the small sample size (N = 50) and many possible comparisons, treat results as *exploratory signals*, not confirmatory evidence.
+
+**Reading guide (how to interpret the output in this report)**
+
+- Many sections output a table with columns like `n`, `rho`, `p`, `p_adj`.
+  - `rho` is a **Spearman rank correlation** (monotonic association) between one predictor and one outcome.
+  - `n` is the number of respondents with **non-missing values in both variables** (complete-case for that pair).
+  - `p` is the nominal p-value from `cor.test(..., method = "spearman")`.
+  - `p_adj` is a **Benjamini–Hochberg (BH) false-discovery-rate adjustment** applied *within that table* (i.e., within that “screen” of many pairwise tests).
+- When variables are binary (0/1) or counts, Spearman correlations are still defined; interpret them as rank/monotonic effects (not linear regression slopes).
+- For any correlation, the report enforces `min_n = 10`; if fewer than 10 complete cases exist, the correlation is not computed.
+
+# Helpers (tables, plots, recoding)
+
+This section defines helper functions used throughout the report:
+
+- `recode_*()` functions convert Qualtrics-style string responses into numeric scales (e.g., S5 Likert → 1–5).
+- `spearman_test()` computes one Spearman correlation for a given X–Y pair.
+- `screen_spearman()` runs **many** Spearman correlations across all X–Y pairs you specify, then BH-adjusts the p-values within that screen.
+- `plot_spearman()` draws a scatterplot with a fitted line and prints Spearman correlation in the panel.
+
+```{r}
+count_table <- function(data, var, dropna = TRUE) {
+  data %>%
+    group_by({{ var }}, .drop = dropna) %>%
+    summarize(n = n(), .groups = "drop") %>%
+    mutate(`%` = 100 * n / sum(n)) %>%
+    flextable() %>%
+    colformat_double()
+}
+
+desc_table <- function(data, var, ...) {
+  data %>%
+    group_by(...) %>%
+    summarise(
+      n  = sum(!is.na({{ var }})),
+      M  = mean({{ var }}, na.rm = TRUE),
+      SD = sd({{ var }}, na.rm = TRUE),
+      .groups = "drop"
+    ) %>%
+    flextable() %>%
+    colformat_double()
+}
+
+steelblue_pal <- function(n, alpha = 1, direction = 1) {
+  if (n < 1) stop("`n` must be a positive integer")
+
+  base   <- grDevices::col2rgb("steelblue") / 255
+  lighter <- grDevices::rgb(
+    base[1] + (1 - base[1]) * 0.65,
+    base[2] + (1 - base[2]) * 0.65,
+    base[3] + (1 - base[3]) * 0.65
+  )
+  darker  <- grDevices::rgb(base[1] * 0.35, base[2] * 0.35, base[3] * 0.35)
+
+  pal <- grDevices::colorRampPalette(c(lighter, "steelblue", darker))(n)
+  if (direction < 0) pal <- rev(pal)
+  grDevices::adjustcolor(pal, alpha.f = alpha)
+}
+
+scale_fill_steelblue <- function(..., alpha = 1, direction = 1) {
+  discrete_scale(
+    "fill",
+    "steelblue",
+    palette = function(n) steelblue_pal(n, alpha, direction),
+    ...
+  )
+}
+
+recode_yesno <- function(x) {
+  case_when(
+    x %in% c("Yes", "yes", "1", 1, TRUE) ~ 1,
+    x %in% c("No", "no", "0", 0, FALSE) ~ 0,
+    TRUE ~ NA_real_
+  )
+}
+
+recode_yesno_idk <- function(x) {
+  case_when(
+    x %in% c("Yes", "yes", "1", 1, TRUE) ~ 1,
+    x %in% c("No", "no", "0", 0, FALSE) ~ 0,
+    x %in% c("I don't know", "I dont know", "Don't know", "Dont know") ~ NA_real_,
+    TRUE ~ NA_real_
+  )
+}
+
+recode_acceptability <- function(x) {
+  recode(
+    x,
+    `Completely acceptable` = 1,
+    `Mostly acceptable` = 2,
+    `Neither acceptable nor unacceptable` = 3,
+    `Mostly unacceptable` = 4,
+    `Completely unacceptable` = 5,
+    `Prefer not to answer` = -1
+  )
+}
+
+recode_reasons <- function(x) {
+  recode(
+    x,
+    `Not a reason at all` = 1,
+    `Slightly a reason` = 2,
+    `Moderately a reason` = 3,
+    `Strongly a reason` = 4,
+    `Extremely a reason` = 5
+  )
+}
+
+recode_incentives <- function(x) {
+  recode(
+    x,
+    `1- Not motivating` = 1,
+    `2` = 2,
+    `3` = 3,
+    `4` = 4,
+    `5 - Highly motivating` = 5
+  )
+}
+
+recode_needs <- function(x) {
+  recode(
+    x,
+    `1 - No need` = 1,
+    `2` = 2,
+    `3` = 3,
+    `4` = 4,
+    `5 - High level of need` = 5
+  )
+}
+
+spearman_test <- function(x, y, min_n = 10) {
+  ok <- stats::complete.cases(x, y)
+  n <- sum(ok)
+  if (n < min_n) {
+    return(tibble(n = n, rho = NA_real_, p = NA_real_))
+  }
+
+  ct <- suppressWarnings(stats::cor.test(x[ok], y[ok], method = "spearman", exact = FALSE))
+  tibble(n = n, rho = unname(ct$estimate), p = ct$p.value)
+}
+
+screen_spearman <- function(data, x_vars, y_vars, labels = NULL, min_n = 10) {
+  grid <- tidyr::expand_grid(x = x_vars, y = y_vars)
+
+  out <- purrr::pmap_dfr(grid, function(x, y) {
+    res <- spearman_test(data[[x]], data[[y]], min_n = min_n)
+    res$x <- x
+    res$y <- y
+    res
+  })
+
+  out <- out %>%
+    mutate(
+      p_adj = p.adjust(p, method = "BH"),
+      abs_rho = abs(rho)
+    )
+
+  if (is.null(labels)) {
+    out <- out %>%
+      mutate(x_label = x, y_label = y)
+  } else {
+    out <- out %>%
+      mutate(
+        x_label = purrr::map_chr(x, ~ labels[[.x]] %||% .x),
+        y_label = purrr::map_chr(y, ~ labels[[.x]] %||% .x)
+      )
+  }
+
+  out %>% arrange(p_adj, desc(abs_rho))
+}
+
+plot_spearman <- function(data, x, y, xlab, ylab) {
+  df <- data %>%
+    select(x = all_of(x), y = all_of(y)) %>%
+    drop_na()
+
+  ggscatter(
+    df,
+    x = "x",
+    y = "y",
+    add = "reg.line",
+    conf.int = TRUE,
+    add.params = list(color = "steelblue"),
+    xlab = xlab,
+    ylab = ylab
+  ) +
+    ggpubr::stat_cor(method = "spearman", label.x.npc = "left", label.y.npc = "top") +
+    theme_minimal(base_size = 14)
+}
+```
+
+# Data + derived variables
+
+**What happens in this section**
+
+1) Load the public survey dataset `data_public/public_main.csv` into `results_raw`.
+2) Define label dictionaries (e.g., what each `S5[SQ00x]` stands for) so later tables are readable.
+3) Create a cleaned `results` data frame with:
+   - numeric versions of ordinal items (e.g., S5, S6, H4, I5),
+   - a small set of *derived indices* used repeatedly in EDA (e.g., attrition share, open-science uptake),
+   - convenience demographic variables (e.g., `career_stage_ord`).
+
+```{r}
+results_raw <- readr::read_csv("data_public/public_main.csv", show_col_types = FALSE)
+
+stages <- list(
+  "SQ001" = "Data analysis",
+  "SQ002" = "Formal presentation",
+  "SQ003" = "Professional presentation",
+  "SQ004" = "Submitted manuscript",
+  "SQ005" = "Reviewed manuscript",
+  "SQ006" = "Published paper"
+)
+
+disciplines <- list(
+  "SQ001" = "philosophy of action",
+  "SQ002" = "ethics",
+  "SQ003" = "epistemology",
+  "SQ004" = "philosophy of language",
+  "SQ005" = "philosophy of mind",
+  "SQ006" = "metaphysics",
+  "SQ007" = "foundations of experimental philosophy",
+  "SQ008" = "logic and argumentation theory",
+  "SQ009" = "aesthetics and philosophy of art",
+  "SQ010" = "philosophy of law",
+  "SQ011" = "philosophy of religion"
+)
+
+requirements <- list(
+  "SQ001" = "Sponsor requires a data-management plan",
+  "SQ002" = "Sponsor requires public data",
+  "SQ003" = "Sponsor requires open access publishing",
+  "SQ004" = "Sponsor requires repository upload (preprints/articles)",
+  "SQ005" = "Sponsor requires none of the above"
+)
+
+resources <- list(
+  "SQ001" = "Institution provides publication repository",
+  "SQ002" = "Institution provides data repository",
+  "SQ003" = "Institution provides OA publishing funds",
+  "SQ004" = "Institution provides dissemination assistance",
+  "SQ005" = "Institution provides DOIs for datasets/reports",
+  "SQ006" = "Institution provides none of the above"
+)
+
+activities <- list(
+  "SQ001" = "Publish a preprint",
+  "SQ002" = "Publish in an open access journal",
+  "SQ003" = "Deposit accepted manuscript (green OA)",
+  "SQ004" = "Cite a dataset",
+  "SQ005" = "Cite code/software",
+  "SQ006" = "Publish a data paper / standalone dataset",
+  "SQ007" = "Restricted-access data sharing",
+  "SQ008" = "Share materials independently",
+  "SQ009" = "Share protocols/workflows/methods",
+  "SQ010" = "Pre-register a study",
+  "SQ011" = "Submit a registered report",
+  "SQ012" = "Use a data curation/RDM service",
+  "SQ013" = "Publish a direct replication",
+  "SQ015" = "Publish a micropublication"
+)
+
+consequences <- list(
+  "SQ001" = "Bias in understanding results (incl. effect size inflation)",
+  "SQ002" = "Difficulty evaluating replicability",
+  "SQ003" = "Bias toward novelty over replication",
+  "SQ004" = "Lack of negative-result replications",
+  "SQ005" = "Wasted effort due to redundant studies",
+  "SQ006" = "Reduced study quality due to pressure for significance",
+  "SQ007" = "Career setbacks for early-career/underprivileged groups"
+)
+
+reasons_S5 <- list(
+  "SQ001" = "IP/ownership concerns",
+  "SQ002" = "Fear of misuse/misrepresentation",
+  "SQ003" = "Competitive advantage concerns",
+  "SQ004" = "Lack of direct benefits/incentives",
+  "SQ005" = "Technical challenges",
+  "SQ006" = "Journal policies don't require sharing",
+  "SQ007" = "Fear of criticism/exposing errors",
+  "SQ008" = "Pressure to publish in high-impact journals",
+  "SQ009" = "External restrictions (funders/partners)",
+  "SQ010" = "Lack of training/skills",
+  "SQ011" = "Extra effort feels overwhelming"
+)
+
+incentives_S6 <- list(
+  "SQ001" = "Include in evaluations/assessments",
+  "SQ002" = "Additional dedicated funding",
+  "SQ003" = "X-phi-specific repositories/databases",
+  "SQ004" = "Permanent DOI assignment",
+  "SQ005" = "Standardized templates/guidelines"
+)
+
+needs_H4 <- list(
+  "SQ001" = "Make data useful to others",
+  "SQ002" = "Platforms/repositories/tools",
+  "SQ003" = "Protect confidentiality",
+  "SQ004" = "Reuse rights (copyright/licensing/citations)",
+  "SQ005" = "Long-term preservation/archiving"
+)
+
+cols_R1 <- paste0("R1[", names(stages), "]")
+cols_D8 <- paste0("D8[", names(disciplines), "]")
+cols_S1 <- paste0("S1[", names(requirements), "]")
+cols_S2 <- paste0("S2[", names(resources), "]")
+cols_S5 <- paste0("S5[", names(reasons_S5), "]")
+cols_S6 <- paste0("S6[", names(incentives_S6), "]")
+cols_H4 <- paste0("H4[", names(needs_H4), "]")
+cols_I5 <- paste0("I5[", sprintf("SQ%03d", 1:7), "]")
+cols_I5_extra <- "I5[SQ008]"
+
+s4_present_cols <- names(results_raw)[stringr::str_detect(names(results_raw), "^S4\\[SQ\\d+\\]\\[1\\]$")]
+s4_future_cols <- names(results_raw)[stringr::str_detect(names(results_raw), "^S4\\[SQ\\d+\\]\\[2\\]$")]
+
+results <- results_raw %>%
+  mutate(
+    years_active = D3,
+    methods_courses = D5,
+    projects_per_year = D9,
+    pub_per_year = D10,
+    quant_projects_per_year = D11,
+    I2_num = readr::parse_number(I2),
+    I3_num = readr::parse_number(I3),
+    H3_num = readr::parse_number(H3),
+    career_stage_group = case_when(
+      D7 == "Graduate Student" ~ "Graduate student",
+      D7 == "Post-Doctoral Fellow" ~ "Postdoc",
+      D7 == "Assistant Professor (or equivalent)" ~ "Assistant professor",
+      D7 == "Associate Professor (or equivalent)" ~ "Associate professor",
+      D7 == "Full Professor (or equivalent)" ~ "Full professor",
+      TRUE ~ "Other/NA"
+    ),
+    career_stage_ord = case_when(
+      D7 == "Graduate Student" ~ 1,
+      D7 == "Post-Doctoral Fellow" ~ 2,
+      D7 == "Assistant Professor (or equivalent)" ~ 3,
+      D7 == "Associate Professor (or equivalent)" ~ 4,
+      D7 == "Full Professor (or equivalent)" ~ 5,
+      TRUE ~ NA_real_
+    ),
+    early_career = if_else(career_stage_ord <= 3, 1, 0, missing = NA_real_)
+  )
+
+# Recode key Likert blocks (as in file_drawer_analysis.Rmd)
+results <- results %>%
+  mutate(across(all_of(cols_S5), recode_reasons)) %>%
+  mutate(across(all_of(cols_S6), recode_incentives)) %>%
+  mutate(across(all_of(cols_H4), recode_needs)) %>%
+  mutate(across(all_of(c(cols_I5, cols_I5_extra)), recode_acceptability)) %>%
+  mutate(across(all_of(c(cols_I5, cols_I5_extra)), ~ na_if(., -1)))
+
+# Build compact indices
+s4_present <- results_raw %>%
+  select(all_of(s4_present_cols)) %>%
+  mutate(across(everything(), recode_yesno_idk))
+
+s4_future <- results_raw %>%
+  select(all_of(s4_future_cols)) %>%
+  mutate(across(everything(), recode_yesno_idk))
+
+results <- results %>%
+  mutate(
+    # Attrition indices (RQ1 / Lishner-inspired stage typology)
+    published_n = `R1[SQ006]`,
+    attrition_pre_sub_n = `R1[SQ001]` + `R1[SQ002]` + `R1[SQ003]`,
+    attrition_post_sub_n = `R1[SQ004]` + `R1[SQ005]`,
+    attrition_total_n = attrition_pre_sub_n + attrition_post_sub_n,
+    attrition_share = if_else(
+      (attrition_total_n + published_n) > 0,
+      attrition_total_n / (attrition_total_n + published_n),
+      NA_real_
+    ),
+
+    # Awareness/implications indices
+    I4_familiarity_mean = rowMeans(select(., matches("^I4\\[SQ\\d+\\]\\[1\\]$")), na.rm = TRUE),
+    I4_severity_mean = rowMeans(select(., matches("^I4\\[SQ\\d+\\]\\[2\\]$")), na.rm = TRUE),
+
+    # Barriers/enablers indices
+    barriers_mean = rowMeans(across(all_of(cols_S5)), na.rm = TRUE),
+    incentives_mean = rowMeans(across(all_of(cols_S6)), na.rm = TRUE),
+    training_need_mean = rowMeans(across(all_of(cols_H4)), na.rm = TRUE),
+
+    # Barrier subscales (theory-driven; S5)
+    barriers_defensive = rowMeans(across(all_of(c("S5[SQ001]", "S5[SQ002]", "S5[SQ003]"))), na.rm = TRUE),
+    barriers_skills = rowMeans(across(all_of(c("S5[SQ005]", "S5[SQ010]"))), na.rm = TRUE),
+    barriers_time_incentives = rowMeans(across(all_of(c("S5[SQ004]", "S5[SQ008]", "S5[SQ011]"))), na.rm = TRUE),
+    barriers_external_policy = rowMeans(across(all_of(c("S5[SQ006]", "S5[SQ009]"))), na.rm = TRUE),
+
+    # QRP acceptability (higher = more unacceptable)
+    qrp_unacceptability_mean = rowMeans(across(all_of(cols_I5)), na.rm = TRUE),
+
+    # Sponsor requirements / institutional support
+    sponsor_req_count = rowSums(select(., all_of(paste0("S1[SQ00", 1:4, "]"))) %>% mutate(across(everything(), recode_yesno)), na.rm = TRUE),
+    institution_support_count = rowSums(select(., all_of(paste0("S2[SQ00", 1:5, "]"))) %>% mutate(across(everything(), recode_yesno)), na.rm = TRUE),
+
+    # Open-science uptake (S4)
+    open_science_present_yes = rowSums(s4_present, na.rm = TRUE),
+    open_science_present_denom = rowSums(!is.na(s4_present)),
+    open_science_present_prop = if_else(open_science_present_denom > 0, open_science_present_yes / open_science_present_denom, NA_real_),
+
+    open_science_future_yes = rowSums(s4_future, na.rm = TRUE),
+    open_science_future_denom = rowSums(!is.na(s4_future)),
+    open_science_future_prop = if_else(open_science_future_denom > 0, open_science_future_yes / open_science_future_denom, NA_real_),
+
+    # File-drawer-targeted uptake subset (registered reports, replications, micropublications)
+    fd_practices_present_yes = rowSums(
+      s4_present %>% select(
+        any_of(c("S4[SQ011][1]", "S4[SQ013][1]", "S4[SQ015][1]"))
+      ),
+      na.rm = TRUE
+    ),
+    fd_practices_future_yes = rowSums(
+      s4_future %>% select(
+        any_of(c("S4[SQ011][2]", "S4[SQ013][2]", "S4[SQ015][2]"))
+      ),
+      na.rm = TRUE
+    )
+  )
+
+# Data sharing "ever" (H1): treat any "Yes" route as 1, explicit "No" as 0
+h1_yes_cols <- paste0("H1[", sprintf("SQ%03d", 1:6), "]")
+results <- results %>%
+  mutate(across(all_of(c(h1_yes_cols, "H1[SQ007]")), recode_yesno)) %>%
+  mutate(
+    data_shared_ever = case_when(
+      rowSums(across(all_of(h1_yes_cols)), na.rm = TRUE) > 0 ~ 1,
+      `H1[SQ007]` == 1 ~ 0,
+      TRUE ~ NA_real_
+    ),
+    micropublications_ord = case_when(
+      M1 == "Never" ~ 0,
+      M1 == "Rarely" ~ 1,
+      M1 == "Sometimes" ~ 2,
+      TRUE ~ NA_real_
+    )
+  )
+
+var_labels <- c(
+  years_active = "Years active in experimental philosophy",
+  methods_courses = "Methods/statistics courses completed",
+  projects_per_year = "Projects per year",
+  pub_per_year = "Peer-reviewed publications per year",
+  quant_projects_per_year = "Quantitative projects per year",
+  career_stage_ord = "Career stage (ordinal)",
+  early_career = "Early career (student/postdoc/assistant)",
+
+  published_n = "Published projects",
+  attrition_pre_sub_n = "Attrition before submission",
+  attrition_post_sub_n = "Attrition at submission/review",
+  attrition_total_n = "Total attrition",
+  attrition_share = "Attrition share = attrition/(attrition+published)",
+
+  I2_num = "Familiarity with the file drawer problem",
+  I4_familiarity_mean = "Mean familiarity with consequences",
+  I4_severity_mean = "Mean perceived severity of consequences",
+  qrp_unacceptability_mean = "Mean unacceptability of questionable research practices",
+
+  sponsor_req_count = "Sponsor requirements for open dissemination (count)",
+  institution_support_count = "Institutional supports for open dissemination (count)",
+  barriers_mean = "Mean barriers to sharing/publishing",
+  barriers_defensive = "Barrier subscale: defensive concerns (IP/misuse/competition)",
+  barriers_skills = "Barrier subscale: skills/technical barriers",
+  barriers_time_incentives = "Barrier subscale: time/incentives/pressure",
+  barriers_external_policy = "Barrier subscale: external restrictions/policy",
+  incentives_mean = "Mean motivating incentives",
+  training_need_mean = "Mean training need for data sharing",
+  H3_num = "Willingness to change practices",
+
+  open_science_present_prop = "Current open-science uptake (proportion)",
+  open_science_future_prop = "Future open-science uptake (proportion)",
+  fd_practices_present_yes = "Current file-drawer-targeted practices (count)",
+  fd_practices_future_yes = "Future file-drawer-targeted practices (count)",
+
+  data_shared_ever = "Ever shared data",
+  micropublications_ord = "Micropublications frequency (ordinal)"
+)
+
+keep_vars <- intersect(names(var_labels), names(results))
+```
+
+**Key derived variables used below (plain-language definitions)**
+
+- **Demographics / productivity**
+  - `years_active` = D3 (years active in experimental philosophy)
+  - `methods_courses` = D5 (number of methods/statistics courses)
+  - `projects_per_year` = D9, `pub_per_year` = D10, `quant_projects_per_year` = D11
+  - `career_stage_ord` is an ordinal recode of D7 (Graduate student = 1 … Full professor = 5); `early_career = 1` if `career_stage_ord <= 3`
+- **Attrition / file-drawer exposure (from R1 stage counts)**
+  - `published_n` = R1[SQ006]
+  - `attrition_pre_sub_n` = R1[SQ001] + R1[SQ002] + R1[SQ003] (data analysis + formal + professional presentation)
+  - `attrition_post_sub_n` = R1[SQ004] + R1[SQ005] (submitted + reviewed manuscript)
+  - `attrition_total_n` = `attrition_pre_sub_n + attrition_post_sub_n`
+  - `attrition_share` = `attrition_total_n / (attrition_total_n + published_n)` when denominator > 0
+- **Awareness / implications**
+  - `I2_num` is extracted from the I2 response string (e.g., `"5 - Very familiar"` → 5)
+  - `I4_familiarity_mean` is the mean of the 7 familiarity ratings (I4[...][1])
+  - `I4_severity_mean` is the mean of the 7 severity ratings (I4[...][2])
+- **Barriers / incentives / capacity**
+  - `barriers_mean` = mean of 11 S5 items after recoding to 1–5 (`Not a reason at all` → 1 … `Extremely a reason` → 5)
+  - `incentives_mean` = mean of 5 S6 items after recoding to 1–5
+  - `training_need_mean` = mean of 5 H4 items after recoding to 1–5
+- **Uptake of proposed solutions**
+  - For each S4 item, `"Yes"` → 1, `"No"` → 0, `"I don't know"` → missing.
+  - `open_science_present_prop` = proportion of S4 *present* items answered `"Yes"` among the non-missing S4 present items for that respondent.
+  - `open_science_future_prop` = analogous proportion for S4 *future*.
+  - `fd_practices_present_yes` / `fd_practices_future_yes` = number of `"Yes"` responses for a focused “file-drawer-targeted” subset (registered reports, replications, micropublications).
+- **Data sharing / micropublications**
+  - `data_shared_ever` is derived from H1: it equals 1 if a respondent selected *any* sharing route (H1[SQ001]–H1[SQ006] = Yes), and 0 if they selected H1[SQ007] (“No”).
+  - `micropublications_ord` recodes M1 into 0/1/2 for Never/Rarely/Sometimes.
+
+## Quick descriptive sanity check (key indices)
+
+**What this table is:** a compact descriptive summary of all key variables/indices used in later EDA.  
+For binary variables (0/1), the mean is interpretable as the **proportion** of 1s.
+
+```{r}
+desc_df <- results %>%
+  summarise(across(all_of(keep_vars), list(n = ~sum(!is.na(.x)), M = ~mean(.x, na.rm = TRUE), SD = ~sd(.x, na.rm = TRUE)))) %>%
+  pivot_longer(everything(), names_to = c("var", ".value"), names_pattern = "^(.*)_(n|M|SD)$") %>%
+  mutate(label = unname(var_labels[var])) %>%
+  select(label, n, M, SD) %>%
+  arrange(desc(M))
+
+flextable(desc_df) %>% colformat_double()
+```
+
+# Exploratory relationships (literature-motivated)
+
+**Common analysis template in Sections 1–4:**  
+Each table is a *screen* of multiple pairwise associations computed with `screen_spearman()`:
+
+- statistic: Spearman `rho`
+- missingness: complete-case for each pair
+- multiplicity: BH/FDR `p_adj` computed **within that table** (not across the whole document)
+
+## 1) Resource constraints (S5) vs uptake (S4)
+
+**Goal:** relate broad constraints and “context” variables to uptake behaviors.
+
+- Predictors (`x_vars`):
+  - `barriers_mean` (mean of 11 S5 barrier items; 1–5)
+  - `sponsor_req_count` (count of sponsor requirements selected in S1; 0–4)
+  - `institution_support_count` (count of institutional supports selected in S2; 0–5)
+- Outcomes (`y_vars`):
+  - uptake indices: `open_science_present_prop`, `open_science_future_prop`
+  - file-drawer-targeted uptake: `fd_practices_present_yes`, `fd_practices_future_yes`
+  - dissemination behaviors: `data_shared_ever`, `micropublications_ord`
+
+```{r}
+screen_spearman(
+  results,
+  x_vars = c("barriers_mean", "sponsor_req_count", "institution_support_count"),
+  y_vars = c("open_science_present_prop", "open_science_future_prop", "fd_practices_present_yes", "fd_practices_future_yes", "data_shared_ever", "micropublications_ord"),
+  labels = var_labels
+) %>%
+  select(x_label, y_label, n, rho, p, p_adj) %>%
+  flextable() %>%
+  colformat_double()
+```
+
+**Visualization:** scatterplot of `barriers_mean` vs `open_science_present_prop` with a linear smoother for readability; the annotation reports Spearman correlation.
+
+```{r fig.width=6, fig.height=4}
+plot_spearman(results, "barriers_mean", "open_science_present_prop",
+              var_labels[["barriers_mean"]], var_labels[["open_science_present_prop"]])
+```
+
+## 1a) Which specific barriers relate to data sharing and uptake?
+
+**Goal:** go from the overall `barriers_mean` index to the **individual S5 items**, to see which barrier types actually drive any associations.
+
+- Predictors (`x_vars`): each of the 11 barrier items `S5[SQ001]`–`S5[SQ011]`, recoded to 1–5:
+  - 1 = “Not a reason at all” … 5 = “Extremely a reason”
+- Outcomes (`y_vars`):
+  - `data_shared_ever` (0/1; derived from H1 as described above)
+  - `open_science_present_prop` (0–1; proportion of S4-present items endorsed “Yes”)
+  - `attrition_share` (0–1; attrition/(attrition+published))
+
+Each table below is a separate screen (separate BH correction within the table).
+
+```{r}
+s5_item_labels <- setNames(unlist(reasons_S5), cols_S5)
+labels_ext <- c(var_labels, s5_item_labels)
+
+# S5 items vs ever shared data
+screen_spearman(
+  results,
+  x_vars = cols_S5,
+  y_vars = c("data_shared_ever"),
+  labels = labels_ext
+) %>%
+  filter(!is.na(rho)) %>%
+  select(x_label, n, rho, p, p_adj) %>%
+  flextable() %>%
+  colformat_double()
+```
+
+**Interpretation tip:** for `data_shared_ever` (0/1), a negative `rho` means that higher barrier endorsement is associated with being in the “never shared” group.
+
+```{r}
+# S5 items vs overall open-science uptake (S4 present index)
+screen_spearman(
+  results,
+  x_vars = cols_S5,
+  y_vars = c("open_science_present_prop"),
+  labels = labels_ext
+) %>%
+  filter(!is.na(rho)) %>%
+  select(x_label, n, rho, p, p_adj) %>%
+  flextable() %>%
+  colformat_double()
+```
+
+Here, `open_science_present_prop` is a respondent-level summary of “how many S4 practices do you currently do?”.
+
+```{r}
+# S5 items vs attrition share (R1-based)
+screen_spearman(
+  results,
+  x_vars = cols_S5,
+  y_vars = c("attrition_share"),
+  labels = labels_ext
+) %>%
+  filter(!is.na(rho)) %>%
+  select(x_label, n, rho, p, p_adj) %>%
+  flextable() %>%
+  colformat_double()
+```
+
+Here, `attrition_share` normalizes attrition by overall project volume (`attrition + published`) to reduce “more projects → more attrition” scale effects.
+
+### Reader-friendly group comparisons: ever vs never shared data
+
+Because `data_shared_ever` is binary, it is often easier to read the results as **between-group differences** rather than as Spearman correlations with a 0/1 outcome.
+
+In the table below we report group means/SDs and two common comparisons:
+
+- **Welch t-test** (robust to unequal variances)
+- **Mann–Whitney (Wilcoxon rank-sum)** as a nonparametric check (useful for ordinal Likert items)
+
+`p_adj_*` are Benjamini–Hochberg adjustments computed **within this table** (across all variables listed).
+
+```{r}
+compare_binary_groups <- function(data, group_var, vars, labels = NULL, group_labels = c("Never shared data", "Ever shared data")) {
+  purrr::map_dfr(vars, function(v) {
+    df <- data %>%
+      select(group = all_of(group_var), x = all_of(v)) %>%
+      filter(!is.na(group), !is.na(x)) %>%
+      mutate(group = factor(group, levels = c(0, 1), labels = group_labels))
+
+    if (nrow(df) < 2 || dplyr::n_distinct(df$group) < 2) {
+      return(tibble(
+        var = v,
+        label = labels[[v]] %||% v,
+        n0 = NA_integer_, M0 = NA_real_, SD0 = NA_real_,
+        n1 = NA_integer_, M1 = NA_real_, SD1 = NA_real_,
+        diff = NA_real_,
+        t = NA_real_, df = NA_real_, p_welch = NA_real_,
+        W = NA_real_, p_wilcox = NA_real_
+      ))
+    }
+
+    desc <- df %>%
+      group_by(group) %>%
+      summarise(n = n(), M = mean(x), SD = sd(x), .groups = "drop")
+
+    d0 <- desc %>% filter(group == group_labels[1])
+    d1 <- desc %>% filter(group == group_labels[2])
+
+    # Tests can fail if one group has <2 observations after filtering to complete cases for v.
+    t_out <- tryCatch(
+      broom::tidy(t.test(x ~ group, data = df)),
+      error = function(e) tibble(statistic = NA_real_, parameter = NA_real_, p.value = NA_real_)
+    )
+    w_out <- tryCatch(
+      broom::tidy(wilcox.test(x ~ group, data = df, exact = FALSE)),
+      error = function(e) tibble(statistic = NA_real_, p.value = NA_real_)
+    )
+
+    tibble(
+      var = v,
+      label = labels[[v]] %||% v,
+      n0 = d0$n, M0 = d0$M, SD0 = d0$SD,
+      n1 = d1$n, M1 = d1$M, SD1 = d1$SD,
+      diff = M1 - M0,
+      t = unname(t_out$statistic), df = unname(t_out$parameter), p_welch = unname(t_out$p.value),
+      W = unname(w_out$statistic), p_wilcox = unname(w_out$p.value)
+    )
+  }) %>%
+    mutate(
+      p_adj_welch = p.adjust(p_welch, method = "BH"),
+      p_adj_wilcox = p.adjust(p_wilcox, method = "BH")
+    )
+}
+
+vars_group <- c(
+  "open_science_present_prop",
+  "barriers_mean",
+  "barriers_defensive",
+  "barriers_skills",
+  "barriers_time_incentives",
+  "barriers_external_policy",
+  "S5[SQ001]",
+  "S5[SQ002]",
+  "S5[SQ003]",
+  "S5[SQ006]",
+  "S5[SQ010]",
+  "S5[SQ011]"
+)
+
+labels_group <- c(var_labels, s5_item_labels)
+
+compare_binary_groups(results, "data_shared_ever", vars_group, labels = labels_group) %>%
+  mutate(
+    `Never shared: M (SD)` = sprintf("%.2f (%.2f)", M0, SD0),
+    `Ever shared: M (SD)` = sprintf("%.2f (%.2f)", M1, SD1)
+  ) %>%
+  select(
+    label, n0, `Never shared: M (SD)`,
+    n1, `Ever shared: M (SD)`,
+    diff, p_welch, p_adj_welch, p_wilcox, p_adj_wilcox
+  ) %>%
+  rename(
+    Measure = label,
+    `n (never)` = n0,
+    `n (ever)` = n1,
+    `ΔM (ever - never)` = diff
+  ) %>%
+  flextable() %>%
+  colformat_double(digits = 3)
+```
+
+## 2) Skills/training (D5, H4) vs uptake and barriers
+
+**Goal:** test whether capacity/skills relate to uptake, barriers, and willingness to change.
+
+- Predictors (`x_vars`):
+  - `methods_courses` (D5; count of completed methods/statistics courses)
+  - `training_need_mean` (mean of H4 training-need items; 1–5)
+- Outcomes (`y_vars`):
+  - uptake: `open_science_present_prop`, `fd_practices_present_yes`, `data_shared_ever`
+  - constraints/motivation: `barriers_mean`, `incentives_mean`, `H3_num` (willingness to change)
+
+```{r}
+screen_spearman(
+  results,
+  x_vars = c("methods_courses", "training_need_mean"),
+  y_vars = c("open_science_present_prop", "fd_practices_present_yes", "data_shared_ever", "barriers_mean", "incentives_mean", "H3_num"),
+  labels = var_labels
+) %>%
+  select(x_label, y_label, n, rho, p, p_adj) %>%
+  flextable() %>%
+  colformat_double()
+```
+
+## 3) Awareness/implications (I2, I4) vs uptake and norms (I5)
+
+**Goal:** test whether awareness of publication bias and perceived consequences connect to behavior and norms.
+
+- Predictors (`x_vars`):
+  - `I2_num` (self-rated familiarity with the file drawer problem)
+  - `I4_severity_mean` and `I4_familiarity_mean` (means across the 7 I4 consequences)
+- Outcomes (`y_vars`):
+  - uptake: `open_science_present_prop`, `fd_practices_present_yes`
+  - barriers/incentives: `barriers_mean`, `incentives_mean`
+  - norms proxy: `qrp_unacceptability_mean` (mean of selected I5 QRP ratings; higher = more “unacceptable”)
+
+```{r}
+screen_spearman(
+  results,
+  x_vars = c("I2_num", "I4_severity_mean", "I4_familiarity_mean"),
+  y_vars = c("open_science_present_prop", "fd_practices_present_yes", "barriers_mean", "incentives_mean", "qrp_unacceptability_mean"),
+  labels = var_labels
+) %>%
+  select(x_label, y_label, n, rho, p, p_adj) %>%
+  flextable() %>%
+  colformat_double()
+```
+
+## 4) Attrition experience (R1) vs awareness and uptake
+
+**Goal:** test whether people with more file-drawer exposure differ in awareness, adoption, or perceived barriers.
+
+- Predictors (`x_vars`): four complementary summaries of R1 stage counts:
+  - `attrition_total_n` (raw count)
+  - `attrition_share` (normalized)
+  - `attrition_pre_sub_n` and `attrition_post_sub_n` (where attrition occurs)
+- Outcomes (`y_vars`): awareness (`I2_num`, `I4_severity_mean`), uptake (`open_science_present_prop`, `fd_practices_present_yes`), and barriers/incentives (`barriers_mean`, `incentives_mean`)
+
+```{r}
+screen_spearman(
+  results,
+  x_vars = c("attrition_total_n", "attrition_share", "attrition_pre_sub_n", "attrition_post_sub_n"),
+  y_vars = c("I2_num", "I4_severity_mean", "open_science_present_prop", "fd_practices_present_yes", "barriers_mean", "incentives_mean"),
+  labels = var_labels
+) %>%
+  select(x_label, y_label, n, rho, p, p_adj) %>%
+  flextable() %>%
+  colformat_double()
+```
+
+# Broader screening (demographics → variables of interest)
+
+**Goal:** a wide, pre-specified dredge: relate a small set of demographic/productivity predictors to *all* other derived variables.
+
+- Predictors (`demo_vars`): years active, career stage, early-career indicator, methods courses, and publication/productivity counts.
+- Outcomes (`outcome_vars`): everything else in `keep_vars` (attrition indices, awareness indices, uptake indices, etc.).
+
+The output shows the top 30 associations ranked by BH-adjusted `p_adj` (within this wide screen), then by effect size.
+
+```{r}
+demo_vars <- c("years_active", "career_stage_ord", "early_career", "methods_courses", "projects_per_year", "pub_per_year", "quant_projects_per_year")
+outcome_vars <- setdiff(keep_vars, demo_vars)
+
+screen_spearman(results, x_vars = demo_vars, y_vars = outcome_vars, labels = var_labels) %>%
+  filter(!is.na(rho)) %>%
+  slice_head(n = 30) %>%
+  select(x_label, y_label, n, rho, p, p_adj) %>%
+  flextable() %>%
+  colformat_double()
+```
+
+# Notes for the paper draft (sanity check against existing results)
+
+**What this does:** recomputes the means and SDs of the six R1 stage-count variables directly from the dataset (no modeling), to cross-check numbers reported elsewhere in the draft.
+
+```{r}
+r1_means <- tibble(
+  Stage = unname(stages),
+  var = cols_R1
+) %>%
+  mutate(
+    M = map_dbl(var, ~ mean(results_raw[[.x]], na.rm = TRUE)),
+    SD = map_dbl(var, ~ sd(results_raw[[.x]], na.rm = TRUE))
+  ) %>%
+  select(Stage, M, SD)
+
+flextable(r1_means) %>% colformat_double()
+```
+
+# Extended EDA modules (dredging on purpose)
+
+## 5) Latent “barrier types” (S5) and practical capacity (H4)
+
+**What analysis is this?** Exploratory factor analysis (EFA) on the barrier/training item set.
+
+- Inputs: 11 S5 barrier items (1–5) + 5 H4 training-need items (1–5), treated as numeric/ordinal scores.
+- Step 1 (choose number of factors): `psych::fa.parallel()` (parallel analysis) suggests a factor count (`nf`).
+- Step 2 (fit factor model): `psych::fa(..., fm = "minres", rotate = "oblimin")`.
+  - `minres` = minimum residual factoring (common in EFA).
+  - `oblimin` = oblique rotation (allows factors to correlate, which is plausible here).
+- Output 1: a loadings table (how strongly each item loads on each latent factor).
+- Output 2: factor scores (one score per respondent per factor), then correlations of those scores with outcomes (`data_shared_ever`, `open_science_*`, `attrition_share`).
+
+```{r}
+# Combined item matrix (S5 + H4)
+items_S5H4 <- results %>% select(all_of(cols_S5), all_of(cols_H4))
+
+# Parallel analysis (heuristic; small N -> interpret cautiously)
+pa <- psych::fa.parallel(items_S5H4, fm = "minres", fa = "fa", n.iter = 200, plot = FALSE)
+nf <- pa$nfact
+nf <- ifelse(is.null(nf) || is.na(nf) || nf < 1, 2, nf)
+
+fa_S5H4 <- psych::fa(items_S5H4, nfactors = nf, fm = "minres", rotate = "oblimin", scores = "regression")
+
+loadings_df <- as.data.frame(unclass(fa_S5H4$loadings)) %>%
+  rownames_to_column("item") %>%
+  mutate(item = if_else(
+    item %in% cols_S5,
+    unname(unlist(reasons_S5)[str_extract(item, "(?<=\\[).+?(?=\\])")]),
+    item
+  )) %>%
+  mutate(item = if_else(
+    item %in% cols_H4,
+    unname(unlist(needs_H4)[str_extract(item, "(?<=\\[).+?(?=\\])")]),
+    item
+  ))
+
+flextable(loadings_df) %>% colformat_double()
+```
+
+```{r}
+# Add factor scores (if available) and relate them to outcomes
+if (!is.null(fa_S5H4$scores)) {
+  score_names <- paste0("F_S5H4_", seq_len(ncol(fa_S5H4$scores)))
+  results <- bind_cols(results, as_tibble(fa_S5H4$scores, .name_repair = ~ score_names))
+
+  score_labels <- setNames(
+    paste0("S5/H4 latent factor ", seq_along(score_names)),
+    score_names
+  )
+
+  screen_spearman(
+    results,
+    x_vars = score_names,
+    y_vars = c("data_shared_ever", "open_science_present_prop", "open_science_future_prop", "attrition_share"),
+    labels = c(var_labels, score_labels)
+  ) %>%
+    filter(!is.na(rho)) %>%
+    select(x_label, y_label, n, rho, p, p_adj) %>%
+    flextable() %>%
+    colformat_double()
+}
+```
+
+### 5a) Theory-driven subscales (interpretable indices)
+
+**What analysis is this?** Hand-built, interpretable indices constructed as means of specific S5 items.
+
+Each subscale is a respondent-level mean of the listed items (all on the same 1–5 scale):
+
+- `barriers_defensive` = mean of S5[SQ001] (IP/ownership), S5[SQ002] (misuse fears), S5[SQ003] (competition)
+- `barriers_skills` = mean of S5[SQ005] (technical challenges), S5[SQ010] (lack of training/skills)
+- `barriers_time_incentives` = mean of S5[SQ004] (lack of incentives), S5[SQ008] (high-impact pressure), S5[SQ011] (overwhelming effort)
+- `barriers_external_policy` = mean of S5[SQ006] (journal policy), S5[SQ009] (external restrictions)
+
+We then correlate these subscales with key outcomes (data sharing, uptake, attrition share).
+
+```{r}
+sub_vars <- c(
+  "barriers_defensive",
+  "barriers_skills",
+  "barriers_time_incentives",
+  "barriers_external_policy"
+)
+
+screen_spearman(
+  results,
+  x_vars = sub_vars,
+  y_vars = c("data_shared_ever", "open_science_present_prop", "open_science_future_prop", "attrition_share"),
+  labels = var_labels
+) %>%
+  filter(!is.na(rho)) %>%
+  select(x_label, y_label, n, rho, p, p_adj) %>%
+  flextable() %>%
+  colformat_double()
+```
+
+## 6) Practice ecology: which open-science behaviors “bundle” together? (S4)
+
+**What analysis is this?** Two complementary “behavior ecology” views of S4 *present* practices:
+
+1) **Co-occurrence matrix**: phi correlations (Pearson correlations on 0/1 binaries) between every pair of S4 items.  
+2) **Rule-style summaries**: for each ordered pair A→B, compute support/confidence/lift (association-rule metrics).
+
+### 6a) Pairwise co-occurrence (phi correlations) + clustering
+
+**Inputs:** `s4p` is the respondent-by-item matrix of S4 present items, recoded:
+
+- Yes = 1, No = 0, I don't know = missing
+
+**Statistic:** `phi_mat = cor(s4p, use = "pairwise.complete.obs")`. Because items are binary, this is a phi correlation.
+
+**Heatmap ordering:** hierarchical clustering on distance `(1 - phi)/2` is used *only* to make visual blocks easier to see.
+
+```{r}
+# Build a binary matrix for S4 present (drop NAs pairwise)
+s4p <- s4_present
+
+phi_mat <- cor(s4p, use = "pairwise.complete.obs")
+diag(phi_mat) <- NA_real_
+
+s4_codes <- tibble(col = colnames(s4p)) %>%
+  mutate(
+    code = str_extract(col, "(?<=\\[)SQ\\d+(?=\\])"),
+    label = unname(activities[code])
+  )
+
+phi_long <- as.data.frame(phi_mat) %>%
+  rownames_to_column("col_x") %>%
+  pivot_longer(-col_x, names_to = "col_y", values_to = "phi") %>%
+  left_join(s4_codes, by = c("col_x" = "col")) %>%
+  rename(label_x = label) %>%
+  left_join(s4_codes, by = c("col_y" = "col")) %>%
+  rename(label_y = label) %>%
+  filter(!is.na(phi))
+
+# Heatmap (hierarchical ordering)
+hc <- hclust(as.dist((1 - phi_mat) / 2), method = "average")
+ord <- hc$labels[hc$order]
+
+phi_long <- phi_long %>%
+  mutate(
+    label_x = factor(label_x, levels = s4_codes$label[match(ord, s4_codes$col)]),
+    label_y = factor(label_y, levels = s4_codes$label[match(ord, s4_codes$col)])
+  )
+
+ggplot(phi_long, aes(x = label_x, y = label_y, fill = phi)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "#b3cde3", mid = "white", high = "steelblue", midpoint = 0, na.value = "white") +
+  theme_minimal(base_size = 10) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x = NULL, y = NULL, fill = "phi", title = "S4 (present): co-occurrence (phi)")
+```
+
+```{r}
+# Top co-occurrences (present)
+phi_long %>%
+  arrange(desc(abs(phi))) %>%
+  filter(label_x < label_y) %>%
+  slice_head(n = 20) %>%
+  select(label_x, label_y, phi) %>%
+  flextable() %>%
+  colformat_double()
+```
+
+### 6b) “Gateway” rules (support / confidence / lift)
+
+**Goal:** identify potentially “gateway-like” relationships among practices (purely descriptive).
+
+For each ordered pair A→B (two S4 items), we compute:
+
+- support = P(A = 1 and B = 1)
+- confidence = P(B = 1 | A = 1)
+- lift = confidence / P(B = 1)
+
+We restrict to rules with support ≥ 0.10 to avoid extremely rare co-occurrences.
+
+```{r}
+binary_rule_metrics <- function(A, B) {
+  ok <- complete.cases(A, B)
+  if (sum(ok) < 10) return(tibble(n = sum(ok), support = NA_real_, confidence = NA_real_, lift = NA_real_))
+
+  A1 <- A[ok] == 1
+  B1 <- B[ok] == 1
+
+  supp <- mean(A1 & B1)
+  conf <- ifelse(mean(A1) > 0, supp / mean(A1), NA_real_)
+  lift <- ifelse(mean(B1) > 0, conf / mean(B1), NA_real_)
+
+  tibble(n = sum(ok), support = supp, confidence = conf, lift = lift)
+}
+
+rule_tbl <- expand_grid(a = colnames(s4p), b = colnames(s4p)) %>%
+  filter(a != b) %>%
+  mutate(metrics = map2(a, b, ~ binary_rule_metrics(s4p[[.x]], s4p[[.y]]))) %>%
+  unnest(metrics) %>%
+  left_join(s4_codes %>% select(col, label), by = c("a" = "col")) %>%
+  rename(A = label) %>%
+  left_join(s4_codes %>% select(col, label), by = c("b" = "col")) %>%
+  rename(B = label) %>%
+  filter(!is.na(lift)) %>%
+  filter(support >= 0.10) %>%
+  arrange(desc(lift), desc(confidence), desc(support))
+
+rule_tbl %>%
+  slice_head(n = 20) %>%
+  select(A, B, n, support, confidence, lift) %>%
+  flextable() %>%
+  colformat_double()
+```
+
+## 7) Stability-based dredging (bootstrap “which predictors keep showing up?”)
+
+**What analysis is this?** A nonparametric “stability” check for correlation-based dredging.
+
+For a chosen outcome (e.g., `data_shared_ever`), we:
+
+1) Compute Spearman correlations between the outcome and each predictor (full sample) → `rho`.
+2) Repeat B times (bootstrap resampling respondents with replacement):
+   - recompute the correlations,
+   - rank predictors by |rho|,
+   - keep the top `top_k` predictors.
+3) For each predictor, compute `pick_freq` = proportion of bootstrap runs where it appears in the top `top_k`.
+
+Interpretation: high `pick_freq` means the predictor is *consistently among the strongest correlates* under resampling (still exploratory, not causal).
+
+```{r}
+bootstrap_rank <- function(data, outcome, predictors, B = 500, top_k = 5) {
+  df <- data %>% select(all_of(c(outcome, predictors)))
+  n <- nrow(df)
+
+  cor_once <- function(dd) {
+    x <- dd[[outcome]]
+    map_dbl(predictors, function(p) {
+      y <- dd[[p]]
+      ok <- complete.cases(x, y)
+      if (sum(ok) < 10) return(NA_real_)
+      suppressWarnings(cor(x[ok], y[ok], method = "spearman"))
+    })
+  }
+
+  # baseline correlations (full data)
+  base_rho <- cor_once(df)
+  names(base_rho) <- predictors
+
+  # bootstrap selection frequency
+  picks <- replicate(B, {
+    idx <- sample.int(n, size = n, replace = TRUE)
+    rho <- cor_once(df[idx, , drop = FALSE])
+    ord <- order(abs(rho), decreasing = TRUE, na.last = NA)
+    head(predictors[ord], top_k)
+  }, simplify = FALSE)
+
+  pick_tbl <- tibble(pred = predictors) %>%
+    mutate(
+      pick_freq = map_dbl(pred, ~ mean(map_lgl(picks, function(v) .x %in% v))),
+      rho = base_rho[pred]
+    ) %>%
+    arrange(desc(pick_freq), desc(abs(rho)))
+
+  pick_tbl
+}
+
+predictors_stable <- c(
+  # demographics/productivity
+  "career_stage_ord", "years_active", "methods_courses", "projects_per_year", "pub_per_year", "quant_projects_per_year",
+  # uptake context
+  "sponsor_req_count", "institution_support_count",
+  # awareness/norms
+  "I2_num", "I4_familiarity_mean", "I4_severity_mean", "qrp_unacceptability_mean",
+  # barriers/capacity
+  "barriers_mean", "training_need_mean", "incentives_mean",
+  "barriers_defensive", "barriers_skills", "barriers_time_incentives", "barriers_external_policy"
+)
+predictors_stable <- predictors_stable[predictors_stable %in% names(results)]
+
+outcomes_stable <- c("data_shared_ever", "open_science_present_prop", "attrition_share")
+outcomes_stable <- outcomes_stable[outcomes_stable %in% names(results)]
+
+stable_tbl <- map_dfr(outcomes_stable, function(out) {
+  bootstrap_rank(results, out, predictors_stable, B = 500, top_k = 5) %>%
+    mutate(outcome = out)
+})
+
+stable_tbl %>%
+  group_by(outcome) %>%
+  slice_head(n = 10) %>%
+  ungroup() %>%
+  {
+    lookup_label <- function(key) {
+      if (is.na(key)) return(NA_character_)
+      v1 <- unname(var_labels[key])
+      if (!is.na(v1)) return(v1)
+      v2 <- unname(sub_labels[key])
+      if (!is.na(v2)) return(v2)
+      key
+    }
+    mutate(
+      .,
+      outcome = map_chr(outcome, ~ {
+        if (is.na(.x)) return(NA_character_)
+        v <- unname(var_labels[.x])
+        if (!is.na(v)) v else .x
+      }),
+      pred = map_chr(pred, lookup_label)
+    )
+  } %>%
+  select(outcome, pred, pick_freq, rho) %>%
+  flextable() %>%
+  colformat_double()
+```
+
+## 8) File-drawer pathway typology (R1 + R2–R6)
+
+**What analysis is this?** A crude typology of “why projects stop” among respondents who report any attrition.
+
+- We first restrict to respondents with `attrition_total_n > 0`.
+- For the stage-specific reason items (R2–R6), responses are strings like `"Yes"`, `"No"`, and `"N/A"`.
+  - We recode `"Yes"` → 1 and everything else → 0 (treating `"N/A"` as “not selected”).
+- We then map each reason item into a coarse category:
+  - results-independent (resources/interest; more studies needed)
+  - quality/concerns
+  - results-dependent (null; unimportant/unanticipated; unimportant by editor/reviewers)
+  - structural (journal fit/scope)
+- For each respondent, we count how many items they selected in each category and label the category with the highest count as `dominant`.
+
+This is intentionally reductive (multi-select reasons are collapsed into a single dominant label) and should be treated as a descriptive device.
+
+```{r}
+recode_yesno_na0 <- function(x) {
+  case_when(
+    x %in% c("Yes", "yes", "1", 1, TRUE) ~ 1,
+    TRUE ~ 0
+  )
+}
+
+cols_R2 <- names(results_raw)[startsWith(names(results_raw), "R2[")]
+cols_R3 <- names(results_raw)[startsWith(names(results_raw), "R3[")]
+cols_R4 <- names(results_raw)[startsWith(names(results_raw), "R4[")]
+cols_R5 <- names(results_raw)[startsWith(names(results_raw), "R5[")]
+cols_R6 <- names(results_raw)[startsWith(names(results_raw), "R6[")]
+
+reason_cols <- c(cols_R2, cols_R3, cols_R4, cols_R5, cols_R6)
+reason_cols <- reason_cols[reason_cols %in% names(results_raw)]
+
+pathway <- results %>%
+  mutate(
+    any_attrition = if_else(attrition_total_n > 0, 1, 0, missing = 0)
+  ) %>%
+  filter(any_attrition == 1) %>%
+  mutate(across(all_of(reason_cols), recode_yesno_na0))
+
+# Category mapping
+cat_map <- tribble(
+  ~col,         ~category,
+  "R2[SQ001]",   "Results-independent (resources/interest)",
+  "R2[SQ002]",   "Results-independent (more studies needed)",
+  "R2[SQ003]",   "Quality/concerns",
+  "R2[SQ004]",   "Results-dependent (unimportant/unanticipated)",
+  "R2[SQ005]",   "Results-dependent (null)",
+  "R3[SQ001]",   "Results-independent (resources/interest)",
+  "R3[SQ002]",   "Results-independent (more studies needed)",
+  "R3[SQ003]",   "Quality/concerns",
+  "R3[SQ004]",   "Results-dependent (unimportant/unanticipated)",
+  "R3[SQ005]",   "Results-dependent (null)",
+  "R4[SQ001]",   "Results-independent (resources/interest)",
+  "R4[SQ002]",   "Results-independent (more studies needed)",
+  "R4[SQ003]",   "Quality/concerns",
+  "R4[SQ004]",   "Results-dependent (unimportant/unanticipated)",
+  "R4[SQ005]",   "Results-dependent (null)",
+  "R5[SQ001]",   "Structural (journal fit/scope)",
+  "R5[SQ002]",   "Results-dependent (unimportant by editor)",
+  "R5[SQ003]",   "Quality/concerns",
+  "R5[SQ004]",   "Results-dependent (null)",
+  "R6[SQ001]",   "Quality/concerns",
+  "R6[SQ002]",   "Results-dependent (unimportant by reviewers)",
+  "R6[SQ003]",   "Quality/concerns",
+  "R6[SQ004]",   "Results-dependent (null)"
+) %>% filter(col %in% reason_cols)
+
+path_long <- pathway %>%
+  select(id, attrition_total_n, open_science_present_prop, data_shared_ever, all_of(reason_cols)) %>%
+  pivot_longer(all_of(reason_cols), names_to = "col", values_to = "selected") %>%
+  left_join(cat_map, by = "col")
+
+cat_profile <- path_long %>%
+  group_by(id, category) %>%
+  summarise(n_selected = sum(selected, na.rm = TRUE), .groups = "drop") %>%
+  pivot_wider(names_from = category, values_from = n_selected, values_fill = 0)
+
+# Simple dominant-category assignment
+cat_vars <- setdiff(names(cat_profile), "id")
+cat_profile <- cat_profile %>%
+  rowwise() %>%
+  mutate(
+    total = sum(c_across(all_of(cat_vars))),
+    dominant = if_else(total > 0, cat_vars[which.max(c_across(all_of(cat_vars)))], NA_character_)
+  ) %>%
+  ungroup()
+
+cat_profile %>%
+  count(dominant, sort = TRUE) %>%
+  flextable()
+```
+
+```{r}
+# Compare key outcomes by dominant pathway (very exploratory; small cells)
+pathway %>%
+  left_join(cat_profile %>% select(id, dominant), by = "id") %>%
+  group_by(dominant) %>%
+  summarise(
+    n = n(),
+    open_science_present_prop = mean(open_science_present_prop, na.rm = TRUE),
+    data_shared_ever = mean(data_shared_ever, na.rm = TRUE),
+    attrition_total_n = mean(attrition_total_n, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  arrange(desc(n)) %>%
+  flextable() %>%
+  colformat_double()
+```
+
+## 9) Open text dredging (lightweight regex coding)
+
+**What analysis is this?** A minimal “keyword flagging” pass over the open-text fields.
+
+- We concatenate multiple open text columns (S3 comments, S5 “Other”, venues, final comments, etc.) into one `text_all` string per row in the public *text-only* dataset.
+- We then create binary flags for platform mentions (e.g., OSF) and theme keywords (e.g., “time/effort”) using regex patterns.
+- Outputs:
+  - a prevalence table (how many respondents mention each keyword/theme)
+  - (no correlations in the public report; see note below)
+
+Because mentions are sparse, many flags will have near-zero variance; treat this as a coarse exploratory supplement, not a robust text analysis.
+
+```{r}
+text_public <- readr::read_csv("data_public/public_text.csv", show_col_types = FALSE)
+
+text_cols <- intersect(
+  names(text_public),
+  c(
+    "D7[other]",
+    "D9text",
+    "S3[SQ001comment]", "S3[SQ002comment]", "S3[SQ003comment]", "S3[SQ004comment]", "S3[SQ005comment]", "S3[SQ006comment]",
+    "S5part2other",
+    "M2[other]",
+    "H1[other]",
+    "H2[other]",
+    "H5"
+  )
+)
+
+txt <- text_public %>%
+  transmute(
+    text_all = pmap_chr(across(all_of(text_cols)), function(...) {
+      parts <- c(...)
+      parts <- parts[!is.na(parts)]
+      paste(parts, collapse = " | ")
+    })
+  ) %>%
+  mutate(text_all = str_to_lower(text_all))
+
+flag <- function(pattern) str_detect(txt$text_all, pattern)
+
+txt_flags <- txt %>%
+  transmute(
+    mention_osf = flag("\\bosf\\b|open science framework"),
+    mention_philarchive = flag("philarchive|philpapers"),
+    mention_arxiv = flag("\\barxiv\\b|psy?arxiv"),
+    mention_ssrn = flag("\\bssrn\\b"),
+    mention_researchgate = flag("researchgate"),
+    mention_academia = flag("academia\\.edu"),
+    mention_github = flag("github"),
+    mention_zenodo_figshare = flag("zenodo|figshare"),
+    mention_jasnh = flag("null hypothesis|jasnh"),
+    # theme-ish keywords
+    theme_time_effort = flag("time|effort|overwhelm|busy|laziness|forget"),
+    theme_incentives = flag("incentive|reward|evaluation|promotion|career"),
+    theme_fear_criticism = flag("fear|critici|error"),
+    theme_ip_misuse = flag("intellectual property|ownership|misuse|misrepresent"),
+    theme_journals_review = flag("journal|editor|reviewer|scope|impact")
+  ) %>%
+  mutate(across(everything(), ~ as.numeric(.x)))
+
+flag_vars <- names(txt_flags)
+
+# Prevalence of themes/platform mentions
+txt_flags %>%
+  summarise(across(all_of(flag_vars), ~ sum(.x, na.rm = TRUE))) %>%
+  pivot_longer(everything(), names_to = "flag", values_to = "n") %>%
+  mutate(pct = 100 * n / nrow(txt_flags)) %>%
+  arrange(desc(n)) %>%
+  flextable() %>%
+  colformat_double()
+```
+
+*Note.* In the public release, open-text responses are distributed as a separate, **unlinked** dataset; therefore, we do not compute respondent-level correlations between text flags and the main survey variables here.
