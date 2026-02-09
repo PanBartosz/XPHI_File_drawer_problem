@@ -48,3 +48,5 @@ From the `02_RESULTS/` directory:
 Rscript -e 'rmarkdown::render("file_drawer_analysis.Rmd")'
 Rscript -e 'rmarkdown::render("file_drawer_exploratory_analysis.Rmd")'
 ```
+
+Rendering `02_RESULTS/file_drawer_analysis.Rmd` also writes the four paper figures as 300 DPI, LZW-compressed TIFFs to `figures/`.
