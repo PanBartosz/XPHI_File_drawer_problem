@@ -5,7 +5,8 @@ Data, survey materials, analysis code, rendered reports, and publication figures
 > Maćkiewicz, B., Kuś, K., & Krajewski, G. (2026). Publication bias in experimental philosophy: A survey on the file drawer problem, research attrition, and open science practices. *Synthese, 208*, Article 77. https://doi.org/10.1007/s11229-026-05727-2
 
 - Published article: https://doi.org/10.1007/s11229-026-05727-2
-- Open Science Framework project: https://osf.io/6xn27/
+- Archived project materials: https://doi.org/10.17605/OSF.IO/6XN27
+- Prospective registration: https://doi.org/10.17605/OSF.IO/WDKNJ
 
 ## Repository contents
 
