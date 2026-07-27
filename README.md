@@ -76,4 +76,11 @@ Those third-party files remain subject to the terms specified by their original 
 
 ## Licensing
 
-The OSF project currently specifies no license, and no repository-wide reuse license should be inferred. Third-party materials retain their original licensing terms.
+Except where a file states otherwise, the original contents of this repository
+are dedicated to the public domain under
+[CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/). See
+`LICENSE` for the full legal text.
+
+This dedication applies to the repository, not to the published Synthese
+article. Third-party datasets and other third-party materials retain the terms
+specified by their original sources.

@@ -2,6 +2,7 @@ cff-version: 1.2.0
 message: "Please cite the published article when using these data or analysis materials."
 title: "Data and analysis materials for Publication bias in experimental philosophy"
 type: dataset
+license: CC0-1.0
 authors:
   - family-names: "Maćkiewicz"
     given-names: "Bartosz"
