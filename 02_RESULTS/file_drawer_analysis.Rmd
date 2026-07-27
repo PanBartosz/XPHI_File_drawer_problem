@@ -1,6 +1,5 @@
 ---
-title: 'The file drawer problem in experimental philosophy: what is not published
-  and why?'
+title: 'Publication bias in experimental philosophy: analysis report'
 output:
   pdf_document: default
   html_document: default
@@ -15,7 +14,6 @@ library(tidyverse)
 library(ggpubr)
 library(flextable)
 library(pander)
-library(ggpubr)
 library(stringr)
 library(broom)
 set_flextable_defaults(digits = 2)
@@ -655,15 +653,15 @@ This open-ended free-text item (`D12`) is **not included in the public dataset**
 
 # Prevalence
 
-## [R1] In the past 5 years, how many of the research projects involving quantitative data analysis you have been involved in (including your students’ work) has stopped or terminated at each of the following stages?
+## [R1] In the past 5 years, how many of the research projects involving quantitative data analysis you have been involved in (including your students' work) has stopped or terminated at each of the following stages?
 
 ```{r}
 stages <- list(
   "SQ001" = "Data analysis",
   "SQ002" = "Formal Presentation (e.g., unpublished report, thesis)",
   "SQ003" = "Professional Presentation (e.g., conference presentation, talk)",
-  "SQ004" = "Submitted Manuscript (Editor’s Rejection Reasons)",
-  "SQ005" = "Reviewed Manuscript (Reviewer’s Rejection Reasons)",
+  "SQ004" = "Submitted Manuscript (Editor's Rejection Reasons)",
+  "SQ005" = "Reviewed Manuscript (Reviewer's Rejection Reasons)",
   "SQ006" = "Published paper"
 )
 
@@ -798,7 +796,7 @@ multi_choice_plot(results,
 
 ```{r}
 reasons <- list(
-  "SQ001" = "Not aligned with the journal’s scope or profile",
+  "SQ001" = "Not aligned with the journal's scope or profile",
   "SQ002" = "Results considered unimportant by the editor",
   "SQ003" = "Manuscript quality concerns (e.g., poor writing, excessive length)",
   "SQ004" = "Null results (non-significant findings)"
@@ -1158,7 +1156,7 @@ multi_choice_plot(results,
 activities <- list(
   "SQ001" = "Publish a preprint",
   "SQ002" = "Publish in an open access journal",
-  "SQ003" = "Deposit an author’s accepted manuscript of a non-open access journal article in a repository to make it openly available",
+  "SQ003" = "Deposit an author's accepted manuscript of a non-open access journal article in a repository to make it openly available",
   "SQ004" = "Cite a dataset",
   "SQ005" = "Cite code or software used for data analysis or visualization",
   "SQ006" = "Publish a data paper or publish a dataset independently from a journal article or scholarly work",
@@ -1214,7 +1212,7 @@ invisible(save_figure_tiff(fig2, "figure2_open_science_practices.tiff", width = 
 activities <- list(
   "SQ001" = "Publish a preprint",
   "SQ002" = "Publish in an open access journal",
-  "SQ003" = "Deposit an author’s accepted manuscript of a non-open access journal article in a repository to make it openly available",
+  "SQ003" = "Deposit an author's accepted manuscript of a non-open access journal article in a repository to make it openly available",
   "SQ004" = "Cite a dataset",
   "SQ005" = "Cite code or software used for data analysis or visualization",
   "SQ006" = "Publish a data paper or publish a dataset independently from a journal article or scholarly work",
@@ -1598,19 +1596,19 @@ t.test(borghi_vangulick2020$share_education_platforms, results$`H4[SQ002]`) %>% 
 - `share_education_confidentiality`,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Protecting participant confidentiality in shared data""."
 
 ```{r}
-t.test(borghi_vangulick2020$share_education_platforms, results$`H4[SQ003]`) %>% pander()
+t.test(borghi_vangulick2020$share_education_confidentiality, results$`H4[SQ003]`) %>% pander()
 ```
 
 - `share_education_reuse`,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Understanding reuse rights related to data""."
 
 ```{r}
-t.test(borghi_vangulick2020$share_education_platforms, results$`H4[SQ004]`) %>% pander()
+t.test(borghi_vangulick2020$share_education_reuse, results$`H4[SQ004]`) %>% pander()
 ```
 
 - `share_education_archiving`,"Response to the question ""On a scale of 1 (No need) to 5 (High level of need), please indicate your level of need for training or education for each of the following - Best practices for preserving or archiving data over the long term""."
 
 ```{r}
-t.test(borghi_vangulick2020$share_education_platforms, results$`H4[SQ005]`) %>% pander()
+t.test(borghi_vangulick2020$share_education_archiving, results$`H4[SQ005]`) %>% pander()
 ```
 
 
@@ -1989,7 +1987,7 @@ compare_sc_activities("sc_activities_current_replication",
 
 ## Larsson et al. 2023: QRPs,
 
-```{r}
+```{r message=FALSE}
 library(PASWR2)
 
 qrps = list(

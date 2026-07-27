@@ -44,11 +44,43 @@ if (!"id" %in% names(raw)) {
   stop("Expected an 'id' column in the raw export (LimeSurvey-style export).")
 }
 
+# Derive the data-sharing group before open-text responses are separated from
+# the main dataset. This preserves valid "Other" sharing routes without
+# exposing or linking their text in public_main.csv.
+is_selected <- function(x) {
+  value <- str_to_lower(str_trim(as.character(x)))
+  !is.na(value) & value %in% c("y", "yes", "1", "true")
+}
+
+has_text <- function(x) {
+  value <- str_trim(as.character(x))
+  !is.na(value) & nzchar(value)
+}
+
+h1_route_cols <- paste0("H1[SQ", sprintf("%03d", 1:6), "]")
+required_h1_cols <- c(h1_route_cols, "H1[SQ007]")
+missing_h1_cols <- setdiff(required_h1_cols, names(raw))
+if (length(missing_h1_cols) > 0) {
+  stop(paste0("Missing expected H1 columns: ", paste(missing_h1_cols, collapse = ", ")))
+}
+
+has_predefined_route <- rowSums(as.data.frame(lapply(raw[h1_route_cols], is_selected))) > 0
+has_other_route <- if ("H1[other]" %in% names(raw)) has_text(raw[["H1[other]"]]) else FALSE
+explicit_never_shared <- is_selected(raw[["H1[SQ007]"]])
+
+raw$data_shared_ever <- ifelse(
+  has_predefined_route | has_other_route,
+  "Yes",
+  ifelse(explicit_never_shared, "No", NA_character_)
+)
+
 meta_cols <- intersect(
   names(raw),
   c("id", "seed", "submitdate", "lastpage", "startlanguage", "startdate", "datestamp", "interviewtime")
 )
-time_cols <- names(raw)[str_detect(names(raw), "Time$")]
+time_cols <- names(raw)[
+  str_detect(names(raw), regex("(^groupTime)|Time$", ignore_case = TRUE))
+]
 
 # Geo/spec columns (released separately, shuffled)
 geo_cols <- intersect(names(raw), c("D4", "D6"))
@@ -118,6 +150,7 @@ stop_if_present <- function(df, cols, where) {
 stop_if_present(public_main, c("D4", "D6"), "public_main.csv")
 stop_if_present(public_main, names(raw)[str_detect(names(raw), "^D8\\[")], "public_main.csv")
 stop_if_present(public_main, c("D12", "H5"), "public_main.csv")
+stop_if_present(public_main, c(setdiff(meta_cols, "id"), time_cols), "public_main.csv")
 
 if ("id" %in% names(public_geo_spec)) stop("public_geo_spec.csv should not include 'id'.")
 if ("id" %in% names(public_text)) stop("public_text.csv should not include 'id'.")

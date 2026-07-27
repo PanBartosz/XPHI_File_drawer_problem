@@ -448,16 +448,13 @@ results <- results %>%
     )
   )
 
-# Data sharing "ever" (H1): treat any "Yes" route as 1, explicit "No" as 0
+# Data sharing "ever" (H1): use the public indicator derived before open-text
+# responses were decoupled, so valid "Other" sharing routes are retained.
 h1_yes_cols <- paste0("H1[", sprintf("SQ%03d", 1:6), "]")
 results <- results %>%
   mutate(across(all_of(c(h1_yes_cols, "H1[SQ007]")), recode_yesno)) %>%
   mutate(
-    data_shared_ever = case_when(
-      rowSums(across(all_of(h1_yes_cols)), na.rm = TRUE) > 0 ~ 1,
-      `H1[SQ007]` == 1 ~ 0,
-      TRUE ~ NA_real_
-    ),
+    data_shared_ever = recode_yesno(data_shared_ever),
     micropublications_ord = case_when(
       M1 == "Never" ~ 0,
       M1 == "Rarely" ~ 1,
@@ -536,7 +533,7 @@ keep_vars <- intersect(names(var_labels), names(results))
   - `open_science_future_prop` = analogous proportion for S4 *future*.
   - `fd_practices_present_yes` / `fd_practices_future_yes` = number of `"Yes"` responses for a focused “file-drawer-targeted” subset (registered reports, replications, micropublications).
 - **Data sharing / micropublications**
-  - `data_shared_ever` is derived from H1: it equals 1 if a respondent selected *any* sharing route (H1[SQ001]–H1[SQ006] = Yes), and 0 if they selected H1[SQ007] (“No”).
+  - `data_shared_ever` is derived from H1 before the open-text data are decoupled: it equals 1 if a respondent selected any predefined sharing route or supplied a non-empty “Other” sharing route, and 0 if they selected H1[SQ007] (“No”).
   - `micropublications_ord` recodes M1 into 0/1/2 for Never/Rarely/Sometimes.
 
 ## Quick descriptive sanity check (key indices)
@@ -758,7 +755,9 @@ compare_binary_groups(results, "data_shared_ever", vars_group, labels = labels_g
     `ΔM (ever - never)` = diff
   ) %>%
   flextable() %>%
-  colformat_double(digits = 3)
+  colformat_double(digits = 3) %>%
+  autofit() %>%
+  fit_to_width(max_width = 6.5)
 ```
 
 ## 2) Skills/training (D5, H4) vs uptake and barriers

@@ -1,0 +1,344 @@
+---
+title: "Likert Sensitivity Analysis"
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    df_print: paged
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+This report documents rank-based sensitivity analyses for the Likert-type items discussed in the paper. The main manuscript reports means and standard deviations for compactness and comparability with previous studies. The goal here is to check whether the main substantive conclusions are preserved when the key comparisons are analyzed with ordinal/rank-based methods.
+
+The analyses use only public data files:
+
+- `data_public/public_main.csv`
+- `borghi_vangulick_2020/Borghi_VanGulick_PsychRDM_Data.csv`
+
+For the comparison with Larsson et al. (2023), the current public analysis uses only published aggregate item summaries from that article. Because raw Larsson item-level responses are not available in this project folder, that external comparison cannot be re-estimated as a Mann-Whitney test here. We therefore report an ordinal within-sample check for the QRP items in the present experimental-philosophy sample.
+
+# Data and helpers
+
+```{r data-and-helpers}
+input_path <- knitr::current_input(dir = TRUE)
+candidate_dirs <- unique(c(
+  getwd(),
+  dirname(normalizePath(input_path, mustWork = FALSE)),
+  dirname(normalizePath(file.path(getwd(), input_path), mustWork = FALSE))
+))
+analysis_dir <- candidate_dirs[file.exists(file.path(candidate_dirs, "data_public/public_main.csv"))][1]
+if (is.na(analysis_dir)) {
+  stop("Could not locate data_public/public_main.csv relative to the working directory or input file.")
+}
+
+main_path <- file.path(analysis_dir, "data_public/public_main.csv")
+borghi_path <- file.path(analysis_dir, "borghi_vangulick_2020/Borghi_VanGulick_PsychRDM_Data.csv")
+
+main <- read.csv(main_path, check.names = FALSE, stringsAsFactors = FALSE)
+borghi <- read.csv(borghi_path, check.names = FALSE, stringsAsFactors = FALSE)
+
+num_from_label <- function(x) {
+  x <- trimws(as.character(x))
+  x[x %in% c("", "N/A", "NA", "Prefer not to answer")] <- NA
+  suppressWarnings(as.numeric(sub("^([0-9]+).*", "\\1", x)))
+}
+
+recode_acceptability <- function(x) {
+  out <- rep(NA_real_, length(x))
+  out[x == "Completely acceptable"] <- 1
+  out[x == "Mostly acceptable"] <- 2
+  out[x == "Neither acceptable nor unacceptable"] <- 3
+  out[x == "Mostly unacceptable"] <- 4
+  out[x == "Completely unacceptable"] <- 5
+  out
+}
+
+recode_reason <- function(x) {
+  out <- rep(NA_real_, length(x))
+  out[x == "Not a reason at all"] <- 1
+  out[x == "Slightly a reason"] <- 2
+  out[x == "Moderately a reason"] <- 3
+  out[x == "Strongly a reason"] <- 4
+  out[x == "Extremely a reason"] <- 5
+  out
+}
+
+fmt_p <- function(p) {
+  if (is.na(p)) return("NA")
+  if (p < .001) return("< .001")
+  sub("^0", "", sprintf("%.3f", p))
+}
+
+fmt_num <- function(x, digits = 2) {
+  ifelse(is.na(x), "NA", sprintf(paste0("%.", digits, "f"), x))
+}
+
+summarise_items <- function(df, cols, labels) {
+  do.call(rbind, lapply(cols, function(col) {
+    x <- df[[col]]
+    x <- x[!is.na(x)]
+    data.frame(
+      Item = labels[[col]],
+      n = length(x),
+      M = mean(x),
+      SD = sd(x),
+      Median = median(x),
+      IQR = IQR(x),
+      stringsAsFactors = FALSE
+    )
+  }))
+}
+
+format_summary_table <- function(df) {
+  transform(
+    df,
+    M = fmt_num(M),
+    SD = fmt_num(SD),
+    Median = fmt_num(Median, 1),
+    IQR = fmt_num(IQR, 1)
+  )
+}
+```
+
+# QRP item sensitivity
+
+The reviewer concern is most relevant for the QRP item comparisons, because those items are single 5-point ratings. Here we test whether the central interpretation holds using rank-based within-subject comparisons.
+
+```{r qrp-analysis}
+labels_i5 <- c(
+  "I5[SQ001]" = "Selecting variables out of convenience/familiarity",
+  "I5[SQ002]" = "Fishing for results by collecting unnecessary variables",
+  "I5[SQ003]" = "Not transparent about data cleaning",
+  "I5[SQ004]" = "Removing items/cases to obtain favorable results",
+  "I5[SQ005]" = "Selective reporting of results/instruments",
+  "I5[SQ006]" = "Cherry-picking data to analyze",
+  "I5[SQ007]" = "Not attempting timely publication"
+)
+i5_cols <- names(labels_i5)
+main[i5_cols] <- lapply(main[i5_cols], recode_acceptability)
+
+i5_summary <- summarise_items(main, i5_cols, labels_i5)
+i5_complete <- main[complete.cases(main[i5_cols]), i5_cols]
+friedman_i5 <- friedman.test(as.matrix(i5_complete))
+
+timely <- "I5[SQ007]"
+i5_pairwise <- do.call(rbind, lapply(setdiff(i5_cols, timely), function(col) {
+  ok <- complete.cases(main[, c(timely, col)])
+  wt <- suppressWarnings(wilcox.test(
+    main[[timely]][ok],
+    main[[col]][ok],
+    paired = TRUE,
+    exact = FALSE
+  ))
+  data.frame(
+    Comparison = paste(labels_i5[[timely]], "vs.", labels_i5[[col]]),
+    n_pairs = sum(ok),
+    median_timely = median(main[[timely]][ok]),
+    median_other = median(main[[col]][ok]),
+    V = unname(wt$statistic),
+    p = wt$p.value,
+    stringsAsFactors = FALSE
+  )
+}))
+i5_pairwise$p_holm <- p.adjust(i5_pairwise$p, method = "holm")
+```
+
+Friedman's test across the seven QRP items was significant, χ²(`r unname(friedman_i5$parameter)`) = `r fmt_num(unname(friedman_i5$statistic), 2)`, p `r fmt_p(friedman_i5$p.value)`.
+
+```{r qrp-summary-table}
+knitr::kable(format_summary_table(i5_summary), row.names = FALSE)
+```
+
+Paired Wilcoxon signed-rank tests compare the timely-publication item with each other QRP item. The key result is that the timely-publication item has a lower median rating than each other item, and all paired comparisons remain significant after Holm correction.
+
+```{r qrp-pairwise-table}
+knitr::kable(
+  transform(
+    i5_pairwise,
+    median_timely = fmt_num(median_timely, 1),
+    median_other = fmt_num(median_other, 1),
+    V = fmt_num(V, 1),
+    p = vapply(p, fmt_p, character(1)),
+    p_holm = vapply(p_holm, fmt_p, character(1))
+  ),
+  row.names = FALSE
+)
+```
+
+# Borghi and Van Gulick comparisons
+
+For the raw-data comparisons with Borghi and Van Gulick (2021), we repeat the key comparisons using independent-samples Mann-Whitney tests. The table also reports the original Welch t-test p-values for comparison.
+
+```{r borghi-analysis}
+labels_h4 <- c(
+  "H4[SQ001]" = "Sharing data in reusable form",
+  "H4[SQ002]" = "Platforms/repositories/tools",
+  "H4[SQ003]" = "Participant confidentiality",
+  "H4[SQ004]" = "Reuse rights/licensing",
+  "H4[SQ005]" = "Long-term preservation/archiving"
+)
+h4_cols <- names(labels_h4)
+main[h4_cols] <- lapply(main[h4_cols], num_from_label)
+main$H3_numeric <- num_from_label(main$H3)
+
+compare_independent <- function(x, y) {
+  x <- x[!is.na(x)]
+  y <- y[!is.na(y)]
+  tt <- t.test(x, y)
+  ww <- suppressWarnings(wilcox.test(x, y, exact = FALSE))
+  c(
+    n_x = length(x),
+    median_x = median(x),
+    mean_x = mean(x),
+    n_y = length(y),
+    median_y = median(y),
+    mean_y = mean(y),
+    t_p = tt$p.value,
+    W = unname(ww$statistic),
+    mw_p = ww$p.value
+  )
+}
+
+borghi_tests <- rbind(
+  "Willingness to change practices (H3 vs. collect_change)" =
+    compare_independent(main$H3_numeric, borghi$collect_change),
+  "Training: useful/reusable data" =
+    compare_independent(main[["H4[SQ001]"]], borghi$share_education_useful),
+  "Training: platforms/repositories/tools" =
+    compare_independent(main[["H4[SQ002]"]], borghi$share_education_platforms),
+  "Training: confidentiality" =
+    compare_independent(main[["H4[SQ003]"]], borghi$share_education_confidentiality),
+  "Training: reuse rights/licensing" =
+    compare_independent(main[["H4[SQ004]"]], borghi$share_education_reuse),
+  "Training: long-term archiving" =
+    compare_independent(main[["H4[SQ005]"]], borghi$share_education_archiving)
+)
+borghi_tests <- as.data.frame(borghi_tests)
+borghi_tests$Comparison <- rownames(borghi_tests)
+rownames(borghi_tests) <- NULL
+borghi_tests$mw_p_holm <- p.adjust(borghi_tests$mw_p, method = "holm")
+```
+
+The Mann-Whitney analyses preserve the same substantive interpretation as the mean-based tests: willingness to change practices does not differ between samples, and the only significant training-needs difference after Holm correction concerns platforms, repositories, and tools.
+
+```{r borghi-table}
+knitr::kable(
+  transform(
+    borghi_tests[, c(
+      "Comparison", "n_x", "median_x", "mean_x", "n_y", "median_y",
+      "mean_y", "t_p", "W", "mw_p", "mw_p_holm"
+    )],
+    median_x = fmt_num(median_x, 1),
+    mean_x = fmt_num(mean_x),
+    median_y = fmt_num(median_y, 1),
+    mean_y = fmt_num(mean_y),
+    t_p = vapply(t_p, fmt_p, character(1)),
+    W = fmt_num(W, 1),
+    mw_p = vapply(mw_p, fmt_p, character(1)),
+    mw_p_holm = vapply(mw_p_holm, fmt_p, character(1))
+  ),
+  row.names = FALSE
+)
+```
+
+# Ordinal descriptives for main Likert blocks
+
+These tables provide medians and IQRs alongside means and standard deviations for the main item blocks. They are intended as descriptive checks rather than replacements for the main manuscript tables.
+
+```{r ordinal-descriptives}
+labels_i4 <- c(
+  "SQ001" = "Biased understanding of research results",
+  "SQ002" = "Difficulty evaluating replicability",
+  "SQ003" = "Bias toward novelty over replication",
+  "SQ004" = "Lack of negative-result replications",
+  "SQ005" = "Wasted research effort",
+  "SQ006" = "Reduced study quality due to pressure for significance",
+  "SQ007" = "Career setbacks"
+)
+i4_summary <- do.call(rbind, lapply(names(labels_i4), function(code) {
+  fam <- num_from_label(main[[paste0("I4[", code, "][1]")]])
+  sev <- num_from_label(main[[paste0("I4[", code, "][2]")]])
+  data.frame(
+    Consequence = labels_i4[[code]],
+    familiarity_n = sum(!is.na(fam)),
+    familiarity_M = mean(fam, na.rm = TRUE),
+    familiarity_Median = median(fam, na.rm = TRUE),
+    familiarity_IQR = IQR(fam, na.rm = TRUE),
+    severity_n = sum(!is.na(sev)),
+    severity_M = mean(sev, na.rm = TRUE),
+    severity_Median = median(sev, na.rm = TRUE),
+    severity_IQR = IQR(sev, na.rm = TRUE),
+    stringsAsFactors = FALSE
+  )
+}))
+
+labels_s5 <- c(
+  "S5[SQ001]" = "Intellectual property/ownership concerns",
+  "S5[SQ002]" = "Fear of misuse/misrepresentation",
+  "S5[SQ003]" = "Competitive advantage concerns",
+  "S5[SQ004]" = "Lack of direct benefits/incentives",
+  "S5[SQ005]" = "Technical challenges",
+  "S5[SQ006]" = "Journal policies do not require sharing",
+  "S5[SQ007]" = "Fear of criticism/exposing errors",
+  "S5[SQ008]" = "Pressure to publish in high-impact journals",
+  "S5[SQ009]" = "External restrictions/collaborative agreements",
+  "S5[SQ010]" = "Lack of training/skills",
+  "S5[SQ011]" = "Extra effort feels overwhelming"
+)
+s5_cols <- names(labels_s5)
+main[s5_cols] <- lapply(main[s5_cols], recode_reason)
+s5_summary <- summarise_items(main, s5_cols, labels_s5)
+
+labels_s6 <- c(
+  "S6[SQ001]" = "Researcher evaluations/project assessments",
+  "S6[SQ002]" = "Additional earmarked funding",
+  "S6[SQ003]" = "Experimental-philosophy repositories",
+  "S6[SQ004]" = "Permanent DOIs",
+  "S6[SQ005]" = "Standardized templates/guidelines"
+)
+s6_cols <- names(labels_s6)
+main[s6_cols] <- lapply(main[s6_cols], num_from_label)
+s6_summary <- summarise_items(main, s6_cols, labels_s6)
+
+h4_summary <- summarise_items(main, h4_cols, labels_h4)
+```
+
+## I4 consequences
+
+```{r i4-table}
+knitr::kable(
+  transform(
+    i4_summary,
+    familiarity_M = fmt_num(familiarity_M),
+    familiarity_Median = fmt_num(familiarity_Median, 1),
+    familiarity_IQR = fmt_num(familiarity_IQR, 1),
+    severity_M = fmt_num(severity_M),
+    severity_Median = fmt_num(severity_Median, 1),
+    severity_IQR = fmt_num(severity_IQR, 1)
+  ),
+  row.names = FALSE
+)
+```
+
+## S5 reasons for not sharing/publishing
+
+```{r s5-table}
+knitr::kable(format_summary_table(s5_summary), row.names = FALSE)
+```
+
+## S6 incentives
+
+```{r s6-table}
+knitr::kable(format_summary_table(s6_summary), row.names = FALSE)
+```
+
+## H4 training needs
+
+```{r h4-table}
+knitr::kable(format_summary_table(h4_summary), row.names = FALSE)
+```

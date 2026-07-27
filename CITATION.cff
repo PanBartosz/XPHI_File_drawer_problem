@@ -1,0 +1,36 @@
+cff-version: 1.2.0
+message: "Please cite the published article when using these data or analysis materials."
+title: "Data and analysis materials for Publication bias in experimental philosophy"
+type: dataset
+authors:
+  - family-names: "Maćkiewicz"
+    given-names: "Bartosz"
+    orcid: "https://orcid.org/0000-0002-9460-5742"
+  - family-names: "Kuś"
+    given-names: "Katarzyna"
+    orcid: "https://orcid.org/0000-0002-1112-766X"
+  - family-names: "Krajewski"
+    given-names: "Grzegorz"
+    orcid: "https://orcid.org/0000-0002-6222-9359"
+date-released: 2026-07-27
+repository-code: "https://github.com/PanBartosz/XPHI_File_drawer_problem"
+url: "https://osf.io/6xn27/"
+preferred-citation:
+  type: article
+  authors:
+    - family-names: "Maćkiewicz"
+      given-names: "Bartosz"
+      orcid: "https://orcid.org/0000-0002-9460-5742"
+    - family-names: "Kuś"
+      given-names: "Katarzyna"
+      orcid: "https://orcid.org/0000-0002-1112-766X"
+    - family-names: "Krajewski"
+      given-names: "Grzegorz"
+      orcid: "https://orcid.org/0000-0002-6222-9359"
+  title: "Publication bias in experimental philosophy: a survey on the file drawer problem, research attrition, and open science practices"
+  journal: "Synthese"
+  volume: 208
+  issue: 2
+  year: 2026
+  doi: "10.1007/s11229-026-05727-2"
+  url: "https://doi.org/10.1007/s11229-026-05727-2"
